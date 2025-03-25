@@ -11,9 +11,6 @@ import numpy as np
 
 
 class Kinematic_MPC_Planner(Controller):
-    """
-    """
-
     def __init__(
         self,
         track: Track,
@@ -31,7 +28,7 @@ class Kinematic_MPC_Planner(Controller):
         ]).T
         
         x_min = np.array([-np.inf, -np.inf, self.params.MIN_STEER, self.params.MIN_SPEED, -np.inf])
-        x_max = np.array([+np.inf, +np.inf, self.params.MAX_STEER, 6.0, +np.inf])
+        x_max = np.array([+np.inf, +np.inf, self.params.MAX_STEER, 5.0, +np.inf])
         u_min = np.array([self.params.MIN_DSTEER, self.params.MIN_ACCEL])
         u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
 
