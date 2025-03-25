@@ -1,7 +1,3 @@
-"""
-Casadi KMPC waypoint tracker example
-"""
-
 import numpy as np
 import gymnasium as gym
 from f1tenth_gym.envs import F110Env
@@ -9,12 +5,12 @@ import time
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-from f1tenth_planning.control.nonlinear_mpc.nonlinear_kmpc import NMPCPlanner
+from f1tenth_planning.control import Nonlinear_Kinemtic_MPC_Planner
 
 
 def main():
     """
-    KMPC example. This example uses fixed waypoints throughout the 2 laps.
+    STMPC example. This example uses fixed waypoints throughout the 2 laps.
     For an example using dynamic waypoints, see the lane switcher example.
     """
 
@@ -31,13 +27,10 @@ def main():
     )
 
     # create planner
-    planner = NMPCPlanner(track=env.track, debug=False)
-    planner.config.dlk = (
-        env.track.raceline.ss[1] - env.track.raceline.ss[0]
-    )  # waypoint spacing
+    planner = Nonlinear_Kinemtic_MPC_Planner(track=env.unwrapped.track)
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
-    env.unwrapped.add_render_callback(planner.render_mpc_sol)
+    env.unwrapped.add_render_callback(planner.render_mpc_solution)
 
     # reset environment
     poses = np.array(
@@ -56,7 +49,7 @@ def main():
     laptime = 0.0
     start = time.time()
     while not done:
-        accl, steerv = planner.plan(obs["agent_0"])
+        steerv, accl = planner.plan(obs["agent_0"])
         obs, timestep, terminated, truncated, infos = env.step(
             np.array([[steerv, accl]])
         )
