@@ -19,7 +19,7 @@ class Dynamics_Model(ABC):
         self.params = params
 
     @abstractmethod
-    def f(self, state: dict, control: np.ndarray, params: dynamics_config = None) -> np.ndarray:
+    def f(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> np.ndarray:
         """
         (Non-)linear dynamics model. This function computes the state derivative given the current state and control input. Should be 
         paired with a numerical integrator to propagate the state forward in time (e.g. Runge-Kutta, Euler). All noise in state and control
@@ -29,7 +29,7 @@ class Dynamics_Model(ABC):
             \dot{x} = f(x, u)
 
         Args:
-            state (dict): observation as returned from the environment.
+            state (np.ndarray): observation as returned from the environment.
             control (np.ndarray): control input as (steering_angle, speed)
             params (dynamics_config): vehicle dynamics parameters
 
@@ -39,7 +39,7 @@ class Dynamics_Model(ABC):
         raise NotImplementedError("control method not implemented")
 
     @abstractmethod
-    def linearize_around_state(self, state: dict, control: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
+    def linearize_around_state(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
         """
         Linearize the dynamics model around a given state and control input. This function computes the state Jacobian and control Jacobian
         at the given state and control input. These Jacobians can be used in model-based controllers.
@@ -47,10 +47,9 @@ class Dynamics_Model(ABC):
         Mathematically:
             A = df_dx(x, u)
             B = df_du(x, u)
-            C = f(x, u) - A*x - B*u
 
         Args:
-            state (dict): observation as returned from the environment.
+            state (np.ndarray): observation as returned from the environment.
             control (np.ndarray): control input as (steering_angle, speed)
             params (dynamics_config): vehicle dynamics parameters, overwrites self.params if not None
 
