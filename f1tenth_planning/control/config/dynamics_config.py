@@ -1,7 +1,5 @@
-from dataclasses import dataclass, field
-import numpy as np
+from dataclasses import dataclass
 from f1tenth_gym.envs.f110_env import F110Env
-import math
 
 @dataclass
 class dynamics_config:
