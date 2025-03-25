@@ -5,7 +5,7 @@ from f1tenth_planning.control.config.dynamics_config import dynamics_config
 import numpy as np
 import casadi as ca
 
-class Dynamic_Model(Dynamics_Model):
+class Dynamic_Bicycle_Model(Dynamics_Model):
     """
     Dynamic single-track bicycle model for vehicle dynamics. 
 
@@ -146,7 +146,7 @@ class Dynamic_Model(Dynamics_Model):
                             d_beta_slow                   # dbeta/dt = d_beta
                         ) # dx/dt = f(x,u)
     
-        RHS_DYN = ca.vertcat(
+        RHS_HIGH_SPEED = ca.vertcat(
                             v * ca.cos(yaw + slip_angle),  # dx/dt = v * cos(yaw + slip_angle)
                             v * ca.sin(yaw + slip_angle),  # dy/dt = v * sin(yaw + slip_angle)
                             delta_v,                 # d(delta)/dt = delta_v
@@ -156,10 +156,12 @@ class Dynamic_Model(Dynamics_Model):
                             d_beta_fast                   # dbeta/dt = d_beta
                         ) # dx/dt = f(x,u)
 
-        RHS = ca.if_else(v >= 0.1, RHS, RHS_LOW_SPEED)
+        RHS = ca.if_else(v >= 3.0, RHS_HIGH_SPEED, RHS_LOW_SPEED)
 
         # maps controls from [va, vb, vc, vd].T to [vx, vy, omega].T
         f = ca.Function('f', [states, controls], [RHS])
+
+        return f
         
     def linearize_around_state(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError("Linearization not implemented for dynamic model yet.")
