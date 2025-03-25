@@ -125,7 +125,7 @@ class LTV_MPC_Solver:
         # Optimization goal: minimize the objective function
         self.MPC_prob = cvxpy.Problem(cvxpy.Minimize(objective), constraints)
         
-    def solve(self, x0, xref, uref=None, Q=None, P=None, R=None, Rd=None)-> tuple[np.ndarray, np.ndarray]:  
+    def solve(self, x0, xref, Q=None, P=None, R=None, Rd=None)-> tuple[np.ndarray, np.ndarray]:  
         """
         Solve the LTV-MPC problem for the given initial state and reference trajectory.
 
@@ -162,21 +162,21 @@ class LTV_MPC_Solver:
             self.Rd.value = Rd
             self.config.Rd = Rd
         
-        # Linearize the dynamics model along the reference trajectory
-        A_block, B_block, C_block = self.linearize_dynamics_trajectory(xref, uref)
-        A_block = block_diag(tuple(A_block))
-        B_block = block_diag(tuple(B_block))
-        C_block = np.array(C_block)
-        self.Annz_k.value = A_block.data
-        self.Bnnz_k.value = B_block.data
-        self.Ck_.value = C_block
-
         # Shifted control and state variables for warm start and fallback in case of optimization failure
         last_u = self.uk.value
         last_x = self.xk.value
         shifted_u = np.hstack((last_u[:, 1:], last_u[:, -1].reshape(-1, 1)))
         pred_x = self.discretizer(self.model.f, last_x[:, -1], shifted_u[:, -1], self.config.DT)
         shifted_x = np.hstack((last_x[:, 1:], pred_x.reshape(-1, 1)))
+
+        # Linearize the dynamics model along the previoust predicted trajectory
+        A_block, B_block, C_block = self.linearize_dynamics_trajectory(shifted_x, shifted_u)
+        A_block = block_diag(tuple(A_block))
+        B_block = block_diag(tuple(B_block))
+        C_block = np.array(C_block)
+        self.Annz_k.value = A_block.data
+        self.Bnnz_k.value = B_block.data
+        self.Ck_.value = C_block
 
         # Warm start with shifted control and state variables
         self.xk.value = shifted_x
