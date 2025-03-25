@@ -16,9 +16,9 @@ class LTV_MPC_Solver:
     def __init__(self, config: solver_config, model: Dynamics_Model):
         self.config = config
         self.model = model
-        self.init_problem()
         self.discretizer = euler_discretization
         self.dynamics_discretizer = system_matrix_discretization
+        self.init_problem()
 
     def init_problem(self):
         """
@@ -36,24 +36,26 @@ class LTV_MPC_Solver:
         self.P = cvxpy.Parameter((self.config.nx, self.config.nx), name="P")
 
         # Initialize variables
-        self.xk.value = np.zeros((self.config.nx,))
+        self.xk.value = np.zeros((self.config.nx, self.config.N + 1))
+        self.uk.value = np.zeros((self.config.nu, self.config.N))
 
         # Initialize reference trajectory parameter
         self.ref_traj.value = np.zeros((self.config.nx, self.config.N + 1))
 
         # Initializes block diagonal form of R = [R, R, ..., R] (NU*N, NU*N)
-        R_block = block_diag(tuple([self.Rk] * self.config.N))
+        R_block = block_diag(tuple([self.config.R] * self.config.N))
 
         # Initializes block diagonal form of Rd = [Rd, ..., Rd] (NU*(N-1), NU*(N-1))
-        Rd_block = block_diag(tuple([self.Rdk] * (self.config.N - 1)))
+        Rd_block = block_diag(tuple([self.config.Rd] * (self.config.N - 1)))
 
         # Initializes block diagonal form of Q = [Q, Q, ..., P] (NX*N, NX*N)
-        Q_block = [self.Qk] * self.config.N
-        Q_block.append(self.P)
+        Q_block = [self.config.Q] * self.config.N
+        Q_block.append(self.config.P)
         Q_block = block_diag(tuple(Q_block))
 
         # Formulate and create the finite-horizon optimal control problem (objective function)
         # The FTOCP has the horizon of N timesteps
+        objective = 0
 
         # Objective 1: Influence of the control inputs: Inputs u multiplied by the penalty R
         objective += cvxpy.quad_form(cvxpy.vec(self.uk), R_block)
@@ -63,6 +65,9 @@ class LTV_MPC_Solver:
 
         # Objective 3: Difference from one control input to the next control input weighted by Rd
         objective += cvxpy.quad_form(cvxpy.vec(cvxpy.diff(self.uk, axis=1)), Rd_block)
+
+        # Setup the constraints for the optimization problem
+        constraints = []
 
         # Constraints 1: Calculate the future vehicle behavior/states based on the vehicle dynamics model matrices
         path_predict = np.zeros((self.config.nx, self.config.N + 1))
@@ -103,23 +108,23 @@ class LTV_MPC_Solver:
         self.Ck_.value = C_block
 
         # Add dynamics constraints to the optimization problem
-        constraints += [
+        constraints.append(
             cvxpy.vec(self.xk[:, 1:])
             == self.Ak_ @ cvxpy.vec(self.xk[:, :-1])
             + self.Bk_ @ cvxpy.vec(self.uk)
             + (self.Ck_)
-        ]
+        )
 
         # Constraints 2: State and input constraints
-        constraints += [self.xk[:, 0] == self.x0k]
-        constraints += [self.xk <= self.config.x_max]
-        constraints += [self.xk >= self.config.x_min]
-        constraints += [self.uk <= self.config.u_max]
-        constraints += [self.uk >= self.config.u_min]
+        constraints.append(self.xk[:, 0] == self.x0)
+        constraints.append(self.xk <= self.config.x_max[:, None])
+        constraints.append(self.xk >= self.config.x_min[:, None])
+        constraints.append(self.uk <= self.config.u_max[:, None])
+        constraints.append(self.uk >= self.config.u_min[:, None])
 
         # Constraints 3: Input rate constraints
-        constraints += [cvxpy.diff(self.uk, axis=1) <= self.config.ud_max]
-        constraints += [cvxpy.diff(self.uk, axis=1) >= self.config.ud_min]
+        constraints.append(cvxpy.diff(self.uk, axis=1) <= self.config.ud_max[:, None])
+        constraints.append(cvxpy.diff(self.uk, axis=1) >= self.config.ud_min[:, None])
 
         # Create the optimization problem in CVXPY and setup the workspace
         # Optimization goal: minimize the objective function
@@ -166,11 +171,10 @@ class LTV_MPC_Solver:
         last_u = self.uk.value
         last_x = self.xk.value
         shifted_u = np.hstack((last_u[:, 1:], last_u[:, -1].reshape(-1, 1)))
-        pred_x = self.discretizer(self.model.f, last_x[:, -1], shifted_u[:, -1], self.config.DT)
-        shifted_x = np.hstack((last_x[:, 1:], pred_x.reshape(-1, 1)))
+        pred_x = self.predict_state(x0, last_u)
 
         # Linearize the dynamics model along the previoust predicted trajectory
-        A_block, B_block, C_block = self.linearize_dynamics_trajectory(shifted_x, shifted_u)
+        A_block, B_block, C_block = self.linearize_dynamics_trajectory(pred_x, shifted_u)
         A_block = block_diag(tuple(A_block))
         B_block = block_diag(tuple(B_block))
         C_block = np.array(C_block)
@@ -179,7 +183,7 @@ class LTV_MPC_Solver:
         self.Ck_.value = C_block
 
         # Warm start with shifted control and state variables
-        self.xk.value = shifted_x
+        self.xk.value = pred_x
         self.uk.value = shifted_u
 
         # Solve the optimization problem
@@ -189,10 +193,13 @@ class LTV_MPC_Solver:
             self.MPC_prob.status == cvxpy.OPTIMAL
             or self.MPC_prob.status == cvxpy.OPTIMAL_INACCURATE
         ):
-            return self.uk.value, self.xk.value
+            return self.xk.value, self.uk.value
         else:
             print("Optimization problem failed! Returning the last control input shifted by one timestep.")
-            return shifted_u, shifted_x
+            self.uk.value = np.hstack((shifted_u[:, 1:], shifted_u[:, -1].reshape(-1, 1)))
+            last_pred = self.discretizer(self.model.f, pred_x[:, -1], shifted_u[:, -1], self.config.DT)
+            self.xk.value = np.hstack((pred_x[:, 1:], last_pred.reshape(-1, 1)))
+            return pred_x, shifted_u
 
 
     def predict_state(self, x0, u_traj):
@@ -226,7 +233,7 @@ class LTV_MPC_Solver:
         """
         A, B = self.model.linearize_around_state(x, u)
         Ad, Bd = self.dynamics_discretizer(A, B, self.config.DT)
-        Cd = self.model.f(x, u) - Ad @ x - Bd @ u
+        Cd = x + self.model.f(x, u) * self.config.DT - Ad @ x - Bd @ u
         return Ad, Bd, Cd
     
     def linearize_dynamics_trajectory(self, x_traj, u_traj):
@@ -247,6 +254,6 @@ class LTV_MPC_Solver:
             Ad, Bd, Cd = self.get_system_matrices(x_traj[:, i], u_traj[:, i])
             Ad_traj.append(Ad)
             Bd_traj.append(Bd)
-            Cd_traj.append(Cd)
+            Cd_traj.extend(Cd)
         return Ad_traj, Bd_traj, Cd_traj
     

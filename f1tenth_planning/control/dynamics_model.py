@@ -58,26 +58,6 @@ class Dynamics_Model(ABC):
         """
         raise NotImplementedError("linearize_around_state method not implemented")
     
-    @abstractmethod
-    def linearize_around_trajectory(self, trajectory: np.ndarray, controls: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
-        """
-        Linearize the dynamics model around a given trajectory. This function computes the state Jacobian and control Jacobian
-        at the given trajectory and control inputs. These Jacobians can be used in model-based controllers.
-
-        Mathematically:
-            A = df_dx(x, u)
-            B = df_du(x, u)
-
-        Args:
-            trajectory (np.ndarray): trajectory as (state, control) pairs
-            controls (np.ndarray): control inputs as (steering_angle, speed)
-            params (dynamics_config): vehicle dynamics parameters, overwrites self.params if not None
-
-        Returns:
-            tuple[np.ndarray, np.ndarray]: state Jacobian, control Jacobian
-        """
-        raise NotImplementedError("linearize_around_trajectory method not implemented")
-    
     @property
     def params(self) -> dynamics_config:
         """
@@ -91,8 +71,5 @@ class Dynamics_Model(ABC):
         Set the dynamics configuration parameters without updating nx and nu fields.
         """
         assert isinstance(value, dynamics_config), f"Expected dynamics_config, got {type(value)}"
-        if value.nx != self._params.nx or value.nu != self._params.nu:
-            raise ValueError(f"Cannot update nx or nu fields. Original: (nx={self._params.nx}, nu={self._params.nu}), "
-                     f"New: (nx={value.nx}, nu={value.nu})")
         self._params = value
 

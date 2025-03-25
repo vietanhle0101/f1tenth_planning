@@ -34,14 +34,15 @@ class mpc_config:
     ud_max: np.ndarray = field(default=None)
   
 def kinematic_mpc_config():
+    # [x, y, delta, v, yaw]
     return mpc_config(
-        nx=4,
+        nx=5,
         nu=2,
         N=10,
-        Q=np.diag([18.5, 18.5, 3.5, 0.1]),
-        R=np.diag([0.01, 100.0]),
-        Rd=np.diag([0.01, 100.0]),
-        P=np.diag([18.5, 18.5, 3.5, 0.1]),
+        Q=np.diag([18.0, 18.0, 0.0, 1.2, 18.0]),
+        R=np.diag([0.01, 0.4]),
+        Rd=np.diag([0.002, 0.01]),
+        P=np.diag([18.0, 18.0, 0.0, 1.2, 18.0]),
         dt=0.1
     )
     

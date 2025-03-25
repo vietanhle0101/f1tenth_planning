@@ -31,8 +31,10 @@ import numpy as np
 import gymnasium as gym
 from f1tenth_gym.envs import F110Env
 import time
-
-from f1tenth_planning.control.kinematic_mpc.kinematic_mpc import KMPCPlanner
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+from f1tenth_planning.control import Kinematic_MPC_Planner
 
 
 def main():
@@ -54,13 +56,10 @@ def main():
     )
 
     # create planner
-    planner = KMPCPlanner(track=env.track, debug=False)
-    planner.config.dlk = (
-        env.track.raceline.ss[1] - env.track.raceline.ss[0]
-    )  # waypoint spacing
+    planner = Kinematic_MPC_Planner(track=env.unwrapped.track)
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
-    env.unwrapped.add_render_callback(planner.render_mpc_sol)
+    env.unwrapped.add_render_callback(planner.render_mpc_solution)
 
     # reset environment
     poses = np.array(
@@ -79,7 +78,8 @@ def main():
     laptime = 0.0
     start = time.time()
     while not done:
-        steerv, accl = planner.plan(obs["agent_0"])
+        output = planner.plan(obs["agent_0"])
+        steerv, accl = output
         obs, timestep, terminated, truncated, infos = env.step(
             np.array([[steerv, accl]])
         )

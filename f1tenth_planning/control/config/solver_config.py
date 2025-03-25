@@ -59,7 +59,7 @@ class solver_config:
         # Check that the dimensions of nx and nu are consistent with Q, Qf, R
         assert self.Q.shape == (self.nx, self.nx), "Q matrix has incorrect dimensions"
         assert self.R.shape == (self.nu, self.nu), "R matrix has incorrect dimensions"
-        assert self.P.shape == (self.nx, self.nx), "Qf matrix has incorrect dimensions"
+        assert self.P.shape == (self.nx, self.nx), "P matrix has incorrect dimensions"
         assert self.Rd.shape == (self.nu, self.nu), "Rd matrix has incorrect dimensions"
         assert self.x_min.shape == (self.nx,), "x_min has incorrect dimensions"
         assert self.x_max.shape == (self.nx,), "x_max has incorrect dimensions"

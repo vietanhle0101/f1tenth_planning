@@ -22,16 +22,16 @@ class Kinematic_MPC_Planner(Controller):
     ):
         super(Kinematic_MPC_Planner, self).__init__(track, params)
         self.config = config
-        self.waypoints = [
+        self.waypoints = np.vstack([
             track.raceline.xs,                 # x
             track.raceline.ys,                 # y
             np.zeros_like(track.raceline.xs),  # steering angle reference
             track.raceline.vxs,                # v
             track.raceline.yaws,               # yaw
-        ]
+        ]).T
         
         x_min = np.array([-np.inf, -np.inf, self.params.MIN_STEER, self.params.MIN_SPEED, -np.inf])
-        x_max = np.array([+np.inf, +np.inf, self.params.MAX_STEER, self.params.MAX_SPEED, +np.inf])
+        x_max = np.array([+np.inf, +np.inf, self.params.MAX_STEER, 6.0, +np.inf])
         u_min = np.array([self.params.MIN_DSTEER, self.params.MIN_ACCEL])
         u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
 
@@ -49,11 +49,14 @@ class Kinematic_MPC_Planner(Controller):
             u_min=u_min,
             u_max=u_max,
         )
-        self.model = Kinematic_Model(self.params)
+        self.model = Kinematic_Model(self.track, self.params)
         self.solver = LTV_MPC_Solver(self.solver_config, self.model) 
 
         self.x_pred = None
         self.ref_traj = None
+
+        self.mpc_solution_render = None
+        self.local_plan_render = None
 
     def render_mpc_solution(self, e):
         """
@@ -63,13 +66,13 @@ class Kinematic_MPC_Planner(Controller):
             e: The environment renderer instance used for drawing.
         """
         if self.x_pred is not None:
-            points = self.x_pred[:, :2]
-            if self.lookahead_point_renderer is None:
-                self.lookahead_point_renderer = e.render_points(
+            points = self.x_pred[:2].T
+            if self.mpc_solution_render is None:
+                self.mpc_solution_render = e.render_points(
                     points, color=(128, 0, 0), size=4
                 )
             else:
-                self.lookahead_point_renderer.setData(points)
+                self.mpc_solution_render.setData(points)
 
     def render_local_plan(self, e):
         """
@@ -78,11 +81,11 @@ class Kinematic_MPC_Planner(Controller):
         Args:
             e: The environment renderer instance used for drawing.
         """
-        if self.ref_path is not None:
-            points = self.ref_path[:2].T
+        if self.ref_traj is not None:
+            points = self.ref_traj[:2].T
             if self.local_plan_render is None:
                 self.local_plan_render = e.render_closed_lines(
-                    points, color=(0, 0, 128), size=1
+                    points, color=(0, 0, 128), size=4
                 )
             else:
                 self.local_plan_render.setData(points)
@@ -101,7 +104,7 @@ class Kinematic_MPC_Planner(Controller):
             P (np.ndarray, optional): Terminal cost matrix. Defaults to None.
 
         Returns:
-            control: A tuple (steering_angle, speed) representing the computed steering command and speed.
+            control: A tuple (steering_vel, acc) representing the computed steering velocity and acceleration.
             If no valid lookahead point is found, returns (0.0, 0.0) after issuing a warning.
         """
         if waypoints is not None:
@@ -116,18 +119,27 @@ class Kinematic_MPC_Planner(Controller):
         
         x = state["pose_x"]
         y = state["pose_y"]
-        v = state["linear_velocity"]
+        v = state["linear_vel_x"]
+        yaw = state["pose_theta"]
         x0 = np.array([x, 
                        y, 
                        state["delta"], 
                        v, 
-                       state["pose_theta"]])
+                       yaw
+                       ])
         
-        cx = self.waypoints[0]
-        cy = self.waypoints[1]
+        cx = self.waypoints[:, 0]
+        cy = self.waypoints[:, 1]
         ref_indices = calc_ref_trajectory_indices(x, y, cx, cy, v, self.config.dt, self.config.N)
 
-        self.ref_traj = self.waypoints[:, ref_indices].T
+        self.ref_traj = self.waypoints[ref_indices].T.copy()
+
+        self.ref_traj[-1][self.ref_traj[-1] - yaw > 4.5] = np.abs(
+            self.ref_traj[-1][self.ref_traj[-1] - yaw > 4.5] - (2 * np.pi)
+        )
+        self.ref_traj[-1][self.ref_traj[-1] - yaw < -4.5] = np.abs(
+            self.ref_traj[-1][self.ref_traj[-1] - yaw < -4.5] + (2 * np.pi)
+        )
         self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj, Q, P, R, Rd)
 
-        return self.u_pred[0]
+        return self.u_pred[:, 0]
