@@ -32,7 +32,8 @@ class LTV_MPC_Solver:
 
         self.Qk = cvxpy.Parameter((self.config.nx, self.config.nx), name="Q[k]")
         self.Rk = cvxpy.Parameter((self.config.nu, self.config.nu), name="R[k]")
-        self.Qf = cvxpy.Parameter((self.config.nx, self.config.nx), name="Qf")
+        self.Rdk = cvxpy.Parameter((self.config.nu, self.config.nu), name="Rd[k]")
+        self.P = cvxpy.Parameter((self.config.nx, self.config.nx), name="P")
 
         # Initialize variables
         self.xk.value = np.zeros((self.config.nx,))
@@ -40,24 +41,24 @@ class LTV_MPC_Solver:
         # Initialize reference trajectory parameter
         self.ref_traj.value = np.zeros((self.config.nx, self.config.N + 1))
 
-        # Initializes block diagonal form of R = [R, R, ..., R] (NU*T, NU*T)
-        R_block = block_diag(tuple([self.config.R] * self.config.N))
+        # Initializes block diagonal form of R = [R, R, ..., R] (NU*N, NU*N)
+        R_block = block_diag(tuple([self.Rk] * self.config.N))
 
-        # Initializes block diagonal form of Rd = [Rd, ..., Rd] (NU*(T-1), NU*(T-1))
-        Rd_block = block_diag(tuple([self.config.Rd] * (self.config.N - 1)))
+        # Initializes block diagonal form of Rd = [Rd, ..., Rd] (NU*(N-1), NU*(N-1))
+        Rd_block = block_diag(tuple([self.Rdk] * (self.config.N - 1)))
 
-        # Initializes block diagonal form of Q = [Q, Q, ..., Qf] (NX*T, NX*T)
-        Q_block = [self.config.Q] * (self.config.N)
-        Q_block.append(self.config.Qf)
+        # Initializes block diagonal form of Q = [Q, Q, ..., P] (NX*N, NX*N)
+        Q_block = [self.Qk] * self.config.N
+        Q_block.append(self.P)
         Q_block = block_diag(tuple(Q_block))
 
         # Formulate and create the finite-horizon optimal control problem (objective function)
-        # The FTOCP has the horizon of T timesteps
+        # The FTOCP has the horizon of N timesteps
 
         # Objective 1: Influence of the control inputs: Inputs u multiplied by the penalty R
         objective += cvxpy.quad_form(cvxpy.vec(self.uk), R_block)
 
-        # Objective 2: Deviation of the vehicle from the reference trajectory weighted by Q, including final Timestep T weighted by Qf
+        # Objective 2: Deviation of the vehicle from the reference trajectory weighted by Q, including final Timestep N weighted by P
         objective += cvxpy.quad_form(cvxpy.vec(self.xk - self.ref_traj), Q_block)
 
         # Objective 3: Difference from one control input to the next control input weighted by Rd
@@ -124,7 +125,7 @@ class LTV_MPC_Solver:
         # Optimization goal: minimize the objective function
         self.MPC_prob = cvxpy.Problem(cvxpy.Minimize(objective), constraints)
         
-    def solve(self, x0, xref, uref=None, Q=None, Qf=None, R=None)-> tuple[np.ndarray, np.ndarray]:  
+    def solve(self, x0, xref, uref=None, Q=None, P=None, R=None, Rd=None)-> tuple[np.ndarray, np.ndarray]:  
         """
         Solve the LTV-MPC problem for the given initial state and reference trajectory.
 
@@ -134,6 +135,8 @@ class LTV_MPC_Solver:
             uref (np.ndarray): reference control input of shape (nu, N)
             Q (np.ndarray): state cost matrix
             R (np.ndarray): input cost matrix
+            P (np.ndarray): terminal cost matrix
+            Rd (np.ndarray): input rate cost matrix
 
         Returns:
             np.ndarray: optimal control input of shape (nu, N)
@@ -149,12 +152,15 @@ class LTV_MPC_Solver:
         if Q is not None:
             self.Qk.value = Q
             self.config.Q = Q
-        if Qf is not None:
-            self.Qf.value = Qf
-            self.config.Qf = Qf
+        if P is not None:
+            self.P.value = P
+            self.config.P = P
         if R is not None:
             self.Rk.value = R
             self.config.R = R
+        if Rd is not None:
+            self.Rd.value = Rd
+            self.config.Rd = Rd
         
         # Linearize the dynamics model along the reference trajectory
         A_block, B_block, C_block = self.linearize_dynamics_trajectory(xref, uref)
