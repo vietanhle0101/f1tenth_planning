@@ -3,6 +3,7 @@ from f1tenth_planning.control.dynamics_model import Dynamics_Model
 from f1tenth_planning.control.config.dynamics_config import dynamics_config
 
 import numpy as np
+import casadi as ca
 
 class Kinematic_Model(Dynamics_Model):
     """
@@ -51,6 +52,41 @@ class Kinematic_Model(Dynamics_Model):
 
         return np.array([dx, dy, ddelta, dv, dyaw])
     
+    def f_casadi(self, params: dynamics_config = None) -> ca.Function:
+        if params is not None:
+            self.params = params
+
+        x = ca.SX.sym('x')
+        y = ca.SX.sym('y')
+        delta = ca.SX.sym('delta')
+        v = ca.SX.sym('v')
+        yaw = ca.SX.sym('yaw')
+        states = ca.vertcat(
+            x,
+            y,
+            delta,
+            v,
+            yaw
+        )
+        # control symbolic variables
+        a = ca.SX.sym('a')
+        delta_v = ca.SX.sym('delta_v')
+        controls = ca.vertcat(
+            delta_v,
+            a
+        )
+        RHS = ca.vertcat(
+                            v * ca.cos(yaw),  # dx/dt = v * cos(yaw)
+                            v * ca.sin(yaw),  # dy/dt = v * sin(yaw)
+                            delta_v,  # d(delta)/dt = delta_v
+                            a,  # dv/dt = a
+                            (v/(self.params.WHEELBASE)) * ca.tan(delta)  # dyaw/dt = (v/(Lx+Ly)) * tan(delta)
+                        ) # dx/dt = f(x,u)
+
+        # maps controls from [va, vb, vc, vd].T to [vx, vy, omega].T
+        f = ca.Function('f', [states, controls], [RHS])
+        return f
+
     def linearize_around_state(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
         x, y, delta, v, yaw = state
 

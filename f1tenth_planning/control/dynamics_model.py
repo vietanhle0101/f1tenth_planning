@@ -2,6 +2,7 @@ from __future__ import annotations
 from abc import abstractmethod, ABC
 
 import numpy as np
+import casadi as ca
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.config.dynamics_config import dynamics_config
 
@@ -38,6 +39,25 @@ class Dynamics_Model(ABC):
         """
         raise NotImplementedError("control method not implemented")
 
+    @abstractmethod
+    def f_casadi(self, params: dynamics_config = None) -> ca.Function:
+        """
+        (Non-)linear dynamics model in CasADi symbolic form. This function computes the state derivative given the current state and control 
+        input. Should be paired with a numerical integrator to propagate the state forward in time (e.g. Runge-Kutta, Euler). All noise in state 
+        and control should be handled externally. This function will create symbolic variables for each state and control input, and return a
+        CasADi function that can be used to compute the state derivative.
+        
+        Mathematically:
+            \dot{x} = f(x, u)
+        
+        Args:
+            params (dynamics_config): vehicle dynamics parameters, overwrites self.params if not None
+
+        Returns:
+            ca.Function: CasADi function for the state derivative
+        """
+        raise NotImplementedError("control method not implemented")
+    
     @abstractmethod
     def linearize_around_state(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
         """
