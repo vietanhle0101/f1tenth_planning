@@ -74,6 +74,38 @@ def nearest_point(point, trajectory):
         min_dist_segment,
     )
 
+def calc_ref_trajectory_indices(x, y, cx, cy, v, dt, N):
+    """
+    Calcuate the indices of the reference trajectory for the next N steps based on the current velocity and the distance between waypoints in the reference trajectory.
+    
+    Args:
+        x (float): current x position
+        y (float): current y position
+        v (float): current velocity
+        dt (float): time step
+        cx (numpy.ndarray): x positions of the reference trajectory waypoints
+        cy (numpy.ndarray): y positions of the reference trajectory waypoints
+    """
+
+    # Calculate the distance between waypoints in the reference trajectory
+    dl = np.linalg.norm(np.array([cx[1], cy[1]]) - np.array([cx[0], cy[0]]))    
+
+    # Find the total number of waypoints in the reference trajectory
+    ncourse = len(cx)
+
+    # Find nearest index/setpoint from where the trajectories are calculated
+    _, _, _, ind = nearest_point(np.array([x, y]), np.array([cx, cy]).T)
+
+    # based on current velocity, distance traveled on the ref line between time steps
+    travel = abs(v) * dt
+    dind = travel / dl
+    ind_list = int(ind) + np.insert(
+        np.cumsum(np.repeat(dind, N)), 0, 0
+    ).astype(int)
+    ind_list[ind_list >= ncourse] -= ncourse
+
+    return ind_list
+
 
 @njit(cache=True)
 def intersect_point(point, radius, trajectory, t=0.0, wrap=False):
