@@ -8,7 +8,7 @@ from f1tenth_planning.control.controller import Controller
 from f1tenth_planning.control.config.controller_config import kinematic_mpc_config
 from f1tenth_planning.control.config.solver_config import solver_config
 from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1tenth_params
-from f1tenth_planning.control.dynamics_models.kinematic_model import Kinematic_Model
+from f1tenth_planning.control.dynamics_models.kinematic_model import Kinematic_Bicycle_Model
 from f1tenth_planning.control.controllers.nonlinear_mpc.nonlinear_mpc import Nonlinear_MPC_Solver
 
 class Kinematic_NMPC_Planner(Controller):
@@ -42,11 +42,12 @@ class Kinematic_NMPC_Planner(Controller):
         u_min = np.array([self.params.MIN_DSTEER, self.params.MIN_ACCEL])
         u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
 
+        self.model = Kinematic_Bicycle_Model(self.track, self.params)
         self.solver_config = solver_config(
             DT=config.dt,
             N=config.N,
-            nx=5,
-            nu=2,
+            nx=self.model.nx,
+            nu=self.model.nu,
             Q=config.Q,
             R=config.R,
             Rd=config.Rd,
@@ -67,7 +68,6 @@ class Kinematic_NMPC_Planner(Controller):
             },
             'print_time': 0,
         }
-        self.model = Kinematic_Model(self.track, self.params)
         self.solver = Nonlinear_MPC_Solver(self.solver_config, self.model, ipopt_opts)
 
         self.x_pred = None

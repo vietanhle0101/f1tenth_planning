@@ -3,3 +3,4 @@ from .controllers.pure_pursuit.pure_pursuit import PurePursuitPlanner
 from .controllers.lqr.lqr import LQRController
 from .controllers.kinematic_mpc.kinematic_mpc import Kinematic_MPC_Planner
 from .controllers.nonlinear_mpc.nonlinear_kmpc import Kinematic_NMPC_Planner as Nonlinear_Kinemtic_MPC_Planner
+from .controllers.nonlinear_mpc.nonlinear_dmpc import Dynamic_NMPC_Planner as Nonlinear_Dynamic_MPC_Planner

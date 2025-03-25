@@ -2,7 +2,7 @@ from f1tenth_planning.control.controller import Controller
 from f1tenth_planning.control.config.controller_config import kinematic_mpc_config
 from f1tenth_planning.control.config.solver_config import solver_config
 from f1tenth_planning.utils.utils import calc_ref_trajectory_indices
-from f1tenth_planning.control.dynamics_models.kinematic_model import Kinematic_Model
+from f1tenth_planning.control.dynamics_models.kinematic_model import Kinematic_Bicycle_Model
 from f1tenth_planning.control.controllers.LTV_mpc.LTV_mpc import LTV_MPC_Solver
 from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1tenth_params
 from f1tenth_gym.envs.track import Track
@@ -31,12 +31,13 @@ class Kinematic_MPC_Planner(Controller):
         x_max = np.array([+np.inf, +np.inf, self.params.MAX_STEER, 5.0, +np.inf])
         u_min = np.array([self.params.MIN_DSTEER, self.params.MIN_ACCEL])
         u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
+        self.model = Kinematic_Bicycle_Model(self.track, self.params)
 
         self.solver_config = solver_config(
             DT=config.dt,
             N=config.N,
-            nx=5,
-            nu=2,
+            nx=self.model.nx,
+            nu=self.model.nu,
             Q=config.Q,
             R=config.R,
             Rd=config.Rd,
@@ -46,7 +47,6 @@ class Kinematic_MPC_Planner(Controller):
             u_min=u_min,
             u_max=u_max,
         )
-        self.model = Kinematic_Model(self.track, self.params)
         self.solver = LTV_MPC_Solver(self.solver_config, self.model) 
 
         self.x_pred = None

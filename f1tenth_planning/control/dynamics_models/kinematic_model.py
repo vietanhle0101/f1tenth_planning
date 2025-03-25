@@ -5,7 +5,7 @@ from f1tenth_planning.control.config.dynamics_config import dynamics_config
 import numpy as np
 import casadi as ca
 
-class Kinematic_Model(Dynamics_Model):
+class Kinematic_Bicycle_Model(Dynamics_Model):
     """
     Kinematic bicycle model for vehicle dynamics. 
 
