@@ -15,8 +15,6 @@ class mpc_config:
         R (np.ndarray): Control input cost matrix.
         Rd (np.ndarray): Control input derivative cost matrix (action rate cost).
         P (np.ndarray): Terminal cost matrix.
-        n_ind_search (int): Number of index search iterations.
-        dl (float): Spatial discretization length.
         dt (float): Time discretization interval.
     """
     nx: int
@@ -26,9 +24,14 @@ class mpc_config:
     R: np.ndarray
     Rd: np.ndarray
     P: np.ndarray
-    n_ind_search: int
-    dl: float
     dt: float
+
+    x_min: np.ndarray = field(default=None)
+    x_max: np.ndarray = field(default=None)
+    u_min: np.ndarray = field(default=None)
+    u_max: np.ndarray = field(default=None)
+    ud_min: np.ndarray = field(default=None)
+    ud_max: np.ndarray = field(default=None)
   
 def kinematic_mpc_config():
     return mpc_config(
@@ -39,9 +42,7 @@ def kinematic_mpc_config():
         R=np.diag([0.01, 100.0]),
         Rd=np.diag([0.01, 100.0]),
         P=np.diag([18.5, 18.5, 3.5, 0.1]),
-        n_ind_search=20,
-        dt=0.1,
-        dl=0.03
+        dt=0.1
     )
     
 def dynamic_mpc_config():
@@ -53,9 +54,7 @@ def dynamic_mpc_config():
         R=np.diag([0.5, 4.0]),
         Rd=np.diag([0.3, 4.0]),
         P=np.diag([18.5, 18.5, 0.0, 1.5, 0.0, 0.0, 0.0]),
-        n_ind_search=20,
-        dt=0.1,
-        dl=0.03
+        dt=0.1
     )
 
 
