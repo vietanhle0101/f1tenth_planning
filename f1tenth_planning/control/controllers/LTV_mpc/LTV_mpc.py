@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 class LTV_MPC_Solver:
     """
-    Formulates and solves a Linear Time-Varying Model Predictive Control (LTV-MPC) problem for a time-varying system tracking a reference trajectory.
+    Formulates and solves a Linear Time-Varying Model Predictive Control (LTV-MPC) problem for a time-varying or nonlinaer system tracking a reference trajectory.
     
     """
     def __init__(self, config: solver_config, model: Dynamics_Model):
