@@ -156,11 +156,11 @@ class Dynamic_NMPC_Planner(Controller):
 
         self.ref_traj = self.waypoints[ref_indices].T.copy()
 
-        self.ref_traj[-1][self.ref_traj[-1] - yaw > 4.5] = np.abs(
-            self.ref_traj[-1][self.ref_traj[-1] - yaw > 4.5] - (2 * np.pi)
+        self.ref_traj[4][self.ref_traj[4] - yaw > 4.5] = np.abs(
+            self.ref_traj[4][self.ref_traj[4] - yaw > 4.5] - (2 * np.pi)
         )
-        self.ref_traj[-1][self.ref_traj[-1] - yaw < -4.5] = np.abs(
-            self.ref_traj[-1][self.ref_traj[-1] - yaw < -4.5] + (2 * np.pi)
+        self.ref_traj[4][self.ref_traj[4] - yaw < -4.5] = np.abs(
+            self.ref_traj[4][self.ref_traj[4] - yaw < -4.5] + (2 * np.pi)
         )
         self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj)
 

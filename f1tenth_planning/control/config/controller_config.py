@@ -47,14 +47,15 @@ def kinematic_mpc_config():
     )
     
 def dynamic_mpc_config():
+    # [x, y, delta, v, yaw, yaw_rate, beta]
     return mpc_config(
         nx=7,
-        nu=0,
+        nu=2,
         N=5,
-        Q=np.diag([18.5, 18.5, 0.0, 1.5, 0.0, 0.0, 0.0]),
-        R=np.diag([0.5, 4.0]),
-        Rd=np.diag([0.3, 4.0]),
-        P=np.diag([18.5, 18.5, 0.0, 1.5, 0.0, 0.0, 0.0]),
+        Q=np.diag([18.5, 18.5, 0.0, 7.5, 1.5, 0.4, 0.0]),
+        R=np.diag([0.3, 3.9]),
+        Rd=np.diag([0.3, 3.9]),
+        P=np.diag([18.5, 18.5, 0.0, 7.5, 1.5, 0.4, 0.0]),
         dt=0.1
     )
 
