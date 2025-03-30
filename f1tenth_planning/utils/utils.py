@@ -359,3 +359,16 @@ def map_collision(point, map):
     Returns whether a point is in collision with the map
     """
     pass
+
+
+def input_acceleration_to_speed(v0, acc, dt):
+    """
+    Returns the speed after applying acceleration for a given time
+    """
+    return v0 + acc * dt
+
+def input_steering_speed_to_angle(delta_0, delta_v, dt):
+    """
+    Returns the steering angle after applying steering velocity for a given time
+    """
+    return delta_0 + delta_v * dt
