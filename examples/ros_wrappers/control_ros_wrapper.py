@@ -12,7 +12,7 @@ from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.config.dynamics_config import fullscale_params
 
 import rclpy
-import tf_transformations
+from scipy.spatial.transform import Rotation as R
 from nav_msgs.msg import Odometry
 from ackermann_msgs.msg import AckermannDriveStamped
 from visualization_msgs.msg import MarkerArray, Marker
@@ -24,7 +24,7 @@ class ControlRosWrapper(Node):
         super().__init__("control_node")
         # Load track waypoints
         waypoints_track : Track = Track.from_raceline_file(
-            os.path.join(os.path.dirname(__file__), "new_map.csv"),
+            os.path.join(os.path.dirname(__file__), "ros_map.csv"),
             delimiter=";",
             skip_rows=3,
         )
@@ -118,7 +118,7 @@ class ControlRosWrapper(Node):
         twist = pose_msg.twist.twist
         beta = np.arctan2(twist.linear.y, twist.linear.x)
         quaternion = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
-        euler = tf_transformations.euler_from_quaternion(quaternion)
+        euler = R.from_quat(quaternion).as_euler('xyz', degrees=False)
         theta = euler[2]  # Yaw is the third element
 
         state_dict = {
