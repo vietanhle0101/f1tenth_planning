@@ -101,11 +101,61 @@ def calc_ref_trajectory_indices(x, y, cx, cy, v, dt, N):
     dind = travel / dl
     ind_list = int(ind) + np.insert(
         np.cumsum(np.repeat(dind, N)), 0, 0
-    ).astype(int)
+    ).round().astype(int)
     ind_list[ind_list >= ncourse] -= ncourse
 
     return ind_list
 
+def calc_interpolated_reference_trajectory(x, y, cx, cy, v, dt, N, reference_trajectory):
+    """
+    Calculate the interpolated reference trajectory based on the current position and the reference trajectory waypoints.
+
+    Args:
+        x (float): current x position
+        y (float): current y position
+        cx (numpy.ndarray): x positions of the reference trajectory waypoints
+        cy (numpy.ndarray): y positions of the reference trajectory waypoints
+        v (float): current velocity
+        dt (float): time step
+        N (int): number of points to interpolate
+        reference_trajectory (numpy.ndarray): reference trajectory waypoints
+
+    Returns:
+        ref_list (numpy.ndarray): interpolated reference trajectory
+    """
+    # Calculate the distance between waypoints in the reference trajectory
+    dl = np.linalg.norm(np.array([cx[1], cy[1]]) - np.array([cx[0], cy[0]]))    
+
+    # Find the index closest to the current position and the interpolator t \in [0, 1]
+    _, _, t_current, ind_current = nearest_point(np.array([x, y]), np.array([cx, cy]).T)
+
+    # Find the total number of waypoints in the reference trajectory
+    ncourse = len(cx)
+
+    # based on current velocity, distance traveled on the ref line between time steps in interpolation domain "t"
+    travel = abs(v) * dt
+    dind = travel / dl
+    t_list = t_current + np.insert(
+        np.cumsum(np.repeat(dind, N)), 0, 0
+    )
+    
+    # Get the indices of the previous point to interpolate with for each point
+    ind_list = t_list.astype(int) + ind_current
+
+    # Modulo the indices to wrap around the reference trajectory
+    ind_list = ind_list % ncourse
+
+    # Modulo t_list to [0,1]
+    t_list = t_list % 1.0
+
+    # Get the previous point and the next point to interpolate with
+    prev_states = reference_trajectory[ind_list, :]
+    next_states = reference_trajectory[(ind_list + 1) % ncourse, :]
+
+    # Interpolate between the previous and next points by (1-t)*ref[i] + t*ref[i+1]
+    ref_list = (1 - t_list).reshape(-1, 1) * prev_states + t_list.reshape(-1, 1) * next_states
+
+    return ref_list   
 
 @njit(cache=True)
 def intersect_point(point, radius, trajectory, t=0.0, wrap=False):

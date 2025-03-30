@@ -3,7 +3,7 @@ NMPC waypoint tracker using CasADi. On init, takes in model equation.
 """
 import numpy as np
 from f1tenth_gym.envs.track import Track
-from f1tenth_planning.utils.utils import calc_ref_trajectory_indices
+from f1tenth_planning.utils.utils import calc_interpolated_reference_trajectory
 from f1tenth_planning.control.controller import Controller
 from f1tenth_planning.control.config.controller_config import dynamic_mpc_config
 from f1tenth_planning.control.config.solver_config import solver_config
@@ -152,9 +152,8 @@ class Dynamic_NMPC_Planner(Controller):
         
         cx = self.waypoints[:, 0]
         cy = self.waypoints[:, 1]
-        ref_indices = calc_ref_trajectory_indices(x, y, cx, cy, v, self.config.dt, self.config.N)
-
-        self.ref_traj = self.waypoints[ref_indices].T.copy()
+        v_max_prev = np.max(self.x_pred[3, :]) if self.x_pred is not None else v
+        self.ref_traj = calc_interpolated_reference_trajectory(x, y, cx, cy, v_max_prev, self.config.dt, self.config.N, self.waypoints).T.copy()
 
         self.ref_traj[4][self.ref_traj[4] - yaw > 4.5] = np.abs(
             self.ref_traj[4][self.ref_traj[4] - yaw > 4.5] - (2 * np.pi)
