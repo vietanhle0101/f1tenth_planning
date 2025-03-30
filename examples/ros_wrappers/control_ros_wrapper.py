@@ -50,7 +50,7 @@ class ControlRosWrapper(Node):
 
         odom_topic = '/fixposition/odometry' # '/ego_racecar/odom' for f1tenth_gym, '/pf/pose/odom' for f1tenth car
         self.pose_sub = self.create_subscription(
-            Odometry, odom_topic, self.pose_callback, 10
+            Odometry, odom_topic, self.pose_callback, qos_profile
         )
         
         self.delta = 0.0
@@ -134,8 +134,8 @@ class ControlRosWrapper(Node):
         # Plan control commands
         steer_v, accel = self.planner.plan(state_dict)
 
-        self.publish_visualizations(np.array(self.planner.x_pred[:2, :].T), 
-                                    np.array(self.planner.ref_traj[:2].T))
+        self.publish_visualizations(np.array(self.planner.ref_traj[:2].T),
+                                    np.array(self.planner.x_pred[:2, :].T))
         
         # Convert steer_v and accel to steering angle and speed
         steer = input_steering_speed_to_angle(self.delta, steer_v, self.planner.config.dt)
