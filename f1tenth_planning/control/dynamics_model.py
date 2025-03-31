@@ -59,6 +59,20 @@ class Dynamics_Model(ABC):
         raise NotImplementedError("control method not implemented")
     
     @abstractmethod
+    def f_casadi_opti(self, state: ca.SX, control: ca.SX, params: ca.SX) -> ca.SX:
+        """
+        Casadi OptiStack compatible function for the dynamic model. 
+        
+        Args:
+            x (ca.SX): (nx, 1) state vector
+            u (ca.SX): (nu, 1) control vector
+            p (ca.SX): (num_p, 1) parameter vector
+        Returns:
+            ca.SX: (nx, 1) state derivative
+        """
+        raise NotImplementedError("control method not implemented")
+
+    @abstractmethod
     def linearize_around_state(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
         """
         Linearize the dynamics model around a given state and control input. This function computes the state Jacobian and control Jacobian
@@ -78,6 +92,28 @@ class Dynamics_Model(ABC):
         """
         raise NotImplementedError("linearize_around_state method not implemented")
     
+    @abstractmethod
+    def parameters_vector_from_config(self, params: dynamics_config) -> np.ndarray:
+        """
+        Convert the dynamics configuration parameters into a vector format. This function is useful for optimization problems where the
+        parameters need to be passed as a vector.
+
+        Args:
+            params (dynamics_config): vehicle dynamics parameters
+
+        Returns:
+            np.ndarray: (num_params, 1) vector of parameters
+        """
+        raise NotImplementedError("parameters_vector_from_config method not implemented")
+    
+    @property
+    def num_params(self) -> dynamics_config:
+        """
+        Get the number of parameters from dynamics_config that are actively used in the model.
+        This is useful for determining the size of the parameter vector in optimization problems.
+        """
+        raise NotImplementedError("num_params method not implemented")
+
     @property
     def params(self) -> dynamics_config:
         """

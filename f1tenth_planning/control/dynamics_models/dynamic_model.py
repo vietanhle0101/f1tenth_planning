@@ -110,16 +110,38 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
             a
         )
 
+        params_vector = self.parameters_vector_from_config(self.params)
+        RHS = self.f_casadi_opti(states, controls, params_vector)
+
+        # maps controls from [va, vb, vc, vd].T to [vx, vy, omega].T
+        f = ca.Function('f', [states, controls], [RHS])
+
+        return f
+        
+    def f_casadi_opti(self, state: ca.SX, control: ca.SX, params: ca.SX) -> ca.SX:
         # Extract params for more readable equations
-        mu = self.params.MU
-        m = self.params.M
-        I = self.params.I
-        lr = self.params.LR
-        lf = self.params.LF
-        C_Sf = self.params.C_SF
-        C_Sr = self.params.C_SR
-        h = self.params.H
+        mu = params[0]
+        m = params[1]
+        I = params[2]
+        lr = params[3]
+        lf = params[4]
+        C_Sf = params[5]
+        C_Sr = params[6]
+        h = params[7]
         g = 9.81
+        
+        # Extract state variables from x 
+        x = state[0]
+        y = state[1]
+        delta = state[2]
+        v = state[3]
+        yaw = state[4]
+        yaw_rate = state[5]
+        slip_angle = state[6]
+
+        # Extract control variables from u
+        delta_v = control[0]
+        a = control[1]
 
         dyaw_slow = v * ca.cos(slip_angle) * ca.tan(delta) / (lr + lf)
         d_beta_slow = (lr * delta_v) / ((lr + lf) * ca.cos(delta) ** 2 * (1 + (ca.tan(delta) ** 2 * lr / (lr + lf)) ** 2))
@@ -128,13 +150,13 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
                             v * ca.cos(slip_angle) * delta_v / (ca.cos(delta) ** 2))
         
         dyaw_fast = yaw_rate                # dyaw/dt = yaw_rate
-        dyaw_rate_fast = -mu * m / (v * I * (lr + lf)) * (
+        dyaw_rate_fast = -mu * m / (v * I * (lr + lf) + 0.05) * (
                                         lf ** 2 * C_Sf * (g * lr - a * h) + lr ** 2 * C_Sr * (g * lf + a * h)) * yaw_rate \
                             + mu * m / (I * (lr + lf)) * (lr * C_Sr * (g * lf + a * h) - lf * C_Sf * (g * lr - a * h)) * slip_angle \
                             + mu * m / (I * (lr + lf)) * lf * C_Sf * (g * lr - a * h) * delta # dyaw_rate/dt = RHS
-        d_beta_fast = (mu / (v ** 2 * (lr + lf)) * (C_Sr * (g * lf + a * h) * lr - C_Sf * (g * lr - a * h) * lf) - 1) * yaw_rate \
-                            - mu / (v * (lr + lf)) * (C_Sr * (g * lf + a * h) + C_Sf * (g * lr - a * h)) * slip_angle \
-                            + mu / (v * (lr + lf)) * (C_Sf * (g * lr - a * h)) * delta    # dbeta/dt = RHS
+        d_beta_fast = (mu / (v ** 2 * (lr + lf) + 0.05) * (C_Sr * (g * lf + a * h) * lr - C_Sf * (g * lr - a * h) * lf) - 1) * yaw_rate \
+                            - mu / (v * (lr + lf) + 0.05) * (C_Sr * (g * lf + a * h) + C_Sf * (g * lr - a * h)) * slip_angle \
+                            + mu / (v * (lr + lf) + 0.05) * (C_Sf * (g * lr - a * h)) * delta    # dbeta/dt = RHS
         
         RHS_LOW_SPEED = ca.vertcat(
                             v * ca.cos(yaw + slip_angle),  # dx/dt = v * cos(yaw + slip_angle)
@@ -158,11 +180,39 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
 
         RHS = ca.if_else(v >= 3.0, RHS_HIGH_SPEED, RHS_LOW_SPEED)
 
-        # maps controls from [va, vb, vc, vd].T to [vx, vy, omega].T
-        f = ca.Function('f', [states, controls], [RHS])
+        return RHS
+    
+    def parameters_vector_from_config(self, params):
+        return np.array([
+            params.MU,
+            params.M,
+            params.I,
+            params.LR,
+            params.LF,
+            params.C_SF,
+            params.C_SR,
+            params.H,
+            params.MU,
+        ])
 
-        return f
-        
+    @property
+    def num_params(self) -> int:
+        """
+        Returns the number of parameters for the dynamic model.
+        """
+        active_params = [
+            self.params.MU,
+            self.params.M,
+            self.params.I,
+            self.params.LR,
+            self.params.LF,
+            self.params.C_SF,
+            self.params.C_SR,
+            self.params.H,
+            self.params.MU,
+        ]
+        return len(active_params)
+    
     def linearize_around_state(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError("Linearization not implemented for dynamic model yet.")
         x, y, delta, v, yaw, yaw_rate, slip_angle = state

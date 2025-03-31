@@ -75,18 +75,53 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
             delta_v,
             a
         )
-        RHS = ca.vertcat(
-                            v * ca.cos(yaw),  # dx/dt = v * cos(yaw)
-                            v * ca.sin(yaw),  # dy/dt = v * sin(yaw)
-                            delta_v,  # d(delta)/dt = delta_v
-                            a,  # dv/dt = a
-                            (v/(self.params.WHEELBASE)) * ca.tan(delta)  # dyaw/dt = (v/(Lx+Ly)) * tan(delta)
-                        ) # dx/dt = f(x,u)
+        params_vector = self.parameters_vector_from_config(self.params)
+        RHS = self.f_casadi_opti(states, controls, params_vector)
 
         # maps controls from [va, vb, vc, vd].T to [vx, vy, omega].T
         f = ca.Function('f', [states, controls], [RHS])
         return f
 
+    def f_casadi_opti(self, state: ca.SX, control: ca.SX, params: ca.SX) -> ca.SX:
+        # Extract params for more readable equations
+        wheelbase = params[0]
+       
+        # Extract state variables from x 
+        x = state[0]
+        y = state[1]
+        delta = state[2]
+        v = state[3]
+        yaw = state[4]
+
+        # Extract control variables from u
+        delta_v = control[0]
+        a = control[1]
+
+        RHS = ca.vertcat(
+                            v * ca.cos(yaw),  # dx/dt = v * cos(yaw)
+                            v * ca.sin(yaw),  # dy/dt = v * sin(yaw)
+                            delta_v,  # d(delta)/dt = delta_v
+                            a,  # dv/dt = a
+                            (v/(wheelbase)) * ca.tan(delta)  # dyaw/dt = (v/(Lx+Ly)) * tan(delta)
+                        ) # dx/dt = f(x,u)
+
+        return RHS
+
+    def parameters_vector_from_config(self, params):
+        return np.array([
+            params.WHEELBASE
+        ])
+
+    @property
+    def num_params(self) -> int:
+        """
+        Returns the number of parameters for the dynamic model.
+        """
+        active_params = [
+            self.params.WHEELBASE
+        ]
+        return len(active_params)
+     
     def linearize_around_state(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
         x, y, delta, v, yaw = state
 
