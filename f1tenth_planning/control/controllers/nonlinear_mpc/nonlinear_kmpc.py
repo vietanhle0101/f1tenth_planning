@@ -108,7 +108,7 @@ class Kinematic_NMPC_Planner(Controller):
             else:
                 self.local_plan_render.setData(points)
     
-    def plan(self, state:dict, waypoints=None, Q=None, R=None, Rd=None, P=None):
+    def plan(self, state:dict, waypoints=None, params: dynamics_config = None):
         """
         Compute the control input for the vehicle using a Kinematic MPC planner.
 
@@ -157,6 +157,12 @@ class Kinematic_NMPC_Planner(Controller):
         self.ref_traj[-1][self.ref_traj[-1] - yaw < -4.5] = np.abs(
             self.ref_traj[-1][self.ref_traj[-1] - yaw < -4.5] + (2 * np.pi)
         )
-        self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj)
+
+        opti_params = None
+        if params is not None:
+            opti_params = self.model.parameters_vector_from_config(params)
+            self.params = params
+        
+        self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj, p=opti_params)
 
         return np.array(self.u_pred[:, 0]).flatten()

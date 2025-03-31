@@ -52,10 +52,8 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
 
         return np.array([dx, dy, ddelta, dv, dyaw])
     
-    def f_casadi(self, params: dynamics_config = None) -> ca.Function:
-        if params is not None:
-            self.params = params
-
+    def f_casadi(self) -> ca.Function:
+        # Sstate symbolic variables
         x = ca.SX.sym('x')
         y = ca.SX.sym('y')
         delta = ca.SX.sym('delta')
@@ -68,6 +66,7 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
             v,
             yaw
         )
+
         # control symbolic variables
         a = ca.SX.sym('a')
         delta_v = ca.SX.sym('delta_v')
@@ -75,11 +74,18 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
             delta_v,
             a
         )
-        params_vector = self.parameters_vector_from_config(self.params)
-        RHS = self.f_casadi_opti(states, controls, params_vector)
 
-        # maps controls from [va, vb, vc, vd].T to [vx, vy, omega].T
-        f = ca.Function('f', [states, controls], [RHS])
+        # parameters symbolic variables
+        wheelbase = ca.SX.sym('wheelbase')
+        params = ca.vertcat(
+            wheelbase
+        )
+
+        # right-hand side of the equation
+        RHS = self.f_casadi_opti(states, controls, params)
+
+        # maps controls, states and parameters to the right-hand side of the equation
+        f = ca.Function('f', [states, controls, params], [RHS])
         return f
 
     def f_casadi_opti(self, state: ca.SX, control: ca.SX, params: ca.SX) -> ca.SX:
