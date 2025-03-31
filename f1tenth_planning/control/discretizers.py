@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.linalg as la
 
-def euler_discretization(func, x, u, dt):
+def euler_discretization(func, x, u, p, dt):
     """
     Euler discretization for a given function.
 
@@ -9,14 +9,15 @@ def euler_discretization(func, x, u, dt):
         func (callable): function to discretize
         x (np.ndarray): state
         u (np.ndarray): control input
+        p (np.ndarray): parameters for the function
         dt (float): time step
 
     Returns:
         np.ndarray: discretized state
     """
-    return x + dt * func(x, u)
+    return x + dt * func(x, u, p)
 
-def rk4_discretization(func, x, u, dt):
+def rk4_discretization(func, x, u, p, dt):
     """
     Runge-Kutta 4th order discretization for a given function.
 
@@ -24,15 +25,16 @@ def rk4_discretization(func, x, u, dt):
         func (callable): function to discretize
         x (np.ndarray): state
         u (np.ndarray): control input
+        p (np.ndarray): parameters for the function
         dt (float): time step
 
     Returns:
         np.ndarray: discretized state
     """
-    k1 = dt * func(x, u)
-    k2 = dt * func(x + 0.5 * k1, u)
-    k3 = dt * func(x + 0.5 * k2, u)
-    k4 = dt * func(x + k3, u)
+    k1 = dt * func(x, u, p)
+    k2 = dt * func(x + 0.5 * k1, u, p)
+    k3 = dt * func(x + 0.5 * k2, u, p)
+    k4 = dt * func(x + k3, u, p)
     return x + (k1 + 2 * k2 + 2 * k3 + k4) / 6
 
     
