@@ -30,9 +30,7 @@ Last Modified: 5/5/22
 import numpy as np
 import gymnasium as gym
 import f1tenth_gym
-import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 from f1tenth_planning.control import LQRController
 
 

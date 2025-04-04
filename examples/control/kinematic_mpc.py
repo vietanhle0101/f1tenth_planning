@@ -2,9 +2,7 @@ import numpy as np
 import gymnasium as gym
 from f1tenth_gym.envs import F110Env
 import time
-import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 from f1tenth_planning.control import Kinematic_MPC_Planner
 
 
