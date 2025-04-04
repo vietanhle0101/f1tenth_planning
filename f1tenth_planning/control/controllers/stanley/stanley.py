@@ -71,13 +71,16 @@ class StanleyController(Controller):
             track.raceline.yaws
         ]).T
         self.k_path = k_path
-        
-        self.target_point_renderer = None
-        self.local_plan_render = None
         self.target_point = None
         self.target_index = None
 
-    def render_target_point(self, e):
+        self.control_solution = None
+        self.local_plan = None
+
+        self.control_solution_renderer = None
+        self.local_plan_render = None
+
+    def render_control_solution(self, e):
         """
         Render the target point on the environment.
 
@@ -85,13 +88,13 @@ class StanleyController(Controller):
             e: rendering engine instance used to visualize the target point.
         """
         if self.target_point is not None:
-            points = self.target_point[:2][None]  # shape (1, 2)
-            if self.target_point_renderer is None:
-                self.target_point_renderer = e.render_points(
-                    points, color=(128, 0, 0), size=4
+            self.control_solution = self.target_point[:2][None]  # shape (1, 2)
+            if self.control_solution_renderer is None:
+                self.control_solution_renderer = e.render_points(
+                    self.control_solution, color=(128, 0, 0), size=4
                 )
             else:
-                self.target_point_renderer.setData(points)
+                self.control_solution_renderer.setData(self.control_solution)
 
     def render_local_plan(self, e):
         """
@@ -101,13 +104,13 @@ class StanleyController(Controller):
             e: rendering engine instance used to visualize the local plan.
         """
         if self.target_index is not None:
-            points = self.waypoints[self.target_index : self.target_index + 5, :2]
+            self.local_plan = self.waypoints[self.target_index : self.target_index + 5, :2]
             if self.local_plan_render is None:
                 self.local_plan_render = e.render_closed_lines(
-                    points, color=(0, 0, 128), size=1
+                    self.local_plan, color=(0, 0, 128), size=1
                 )
             else:
-                self.local_plan_render.setData(points)
+                self.local_plan_render.setData(self.local_plan)
 
     def calc_theta_and_ef(self, vehicle_state, waypoints):
         """

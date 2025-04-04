@@ -30,7 +30,7 @@ def main():
     planner = Nonlinear_Dynamic_MPC_Planner(track=env.unwrapped.track)
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
-    env.unwrapped.add_render_callback(planner.render_mpc_solution)
+    env.unwrapped.add_render_callback(planner.render_control_solution)
 
     # reset environment
     poses = np.array(

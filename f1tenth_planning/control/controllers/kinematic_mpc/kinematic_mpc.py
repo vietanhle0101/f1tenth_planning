@@ -52,10 +52,13 @@ class Kinematic_MPC_Planner(Controller):
         self.x_pred = None
         self.ref_traj = None
 
+        self.control_solution = None
+        self.local_plan = None
+
         self.mpc_solution_render = None
         self.local_plan_render = None
 
-    def render_mpc_solution(self, e):
+    def render_control_solution(self, e):
         """
         Callback to render the lookahead point on the environment.
 
@@ -63,13 +66,13 @@ class Kinematic_MPC_Planner(Controller):
             e: The environment renderer instance used for drawing.
         """
         if self.x_pred is not None:
-            points = self.x_pred[:2].T
+            self.control_solution = self.x_pred[:2].T
             if self.mpc_solution_render is None:
                 self.mpc_solution_render = e.render_points(
-                    points, color=(128, 0, 0), size=4
+                    self.control_solution, color=(128, 0, 0), size=4
                 )
             else:
-                self.mpc_solution_render.setData(points)
+                self.mpc_solution_render.setData(self.control_solution)
 
     def render_local_plan(self, e):
         """
@@ -79,13 +82,13 @@ class Kinematic_MPC_Planner(Controller):
             e: The environment renderer instance used for drawing.
         """
         if self.ref_traj is not None:
-            points = self.ref_traj[:2].T
+            self.local_plan = self.ref_traj[:2].T
             if self.local_plan_render is None:
                 self.local_plan_render = e.render_closed_lines(
-                    points, color=(0, 0, 128), size=4
+                    self.local_plan, color=(0, 0, 128), size=4
                 )
             else:
-                self.local_plan_render.setData(points)
+                self.local_plan_render.setData(self.local_plan)
 
     def plan(self, state:dict, waypoints=None, Q=None, R=None, Rd=None, P=None):
         """

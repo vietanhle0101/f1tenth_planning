@@ -30,7 +30,7 @@ def main():
 
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
-    env.unwrapped.add_render_callback(planner.render_lookahead_point)
+    env.unwrapped.add_render_callback(planner.render_control_solution)
 
     # reset environment
     track = env.unwrapped.track
