@@ -59,7 +59,7 @@ class PurePursuitPlanner(Controller):
         target_index (int or None): Index of the current waypoint.
     """
 
-    def __init__(self, track: Track, params: dynamics_config = f1tenth_params(), lookahead_distance=0.8, max_reacquire=20.0):
+    def __init__(self, track: Track, params: dynamics_config = f1tenth_params(), lookahead_distance=2.0, max_reacquire=20.0):
         super(PurePursuitPlanner, self).__init__(track, params, 
                                                  control_mode=(SteerActionEnum.Steering_Angle, LongitudinalActionEnum.Speed))
         self.waypoints = np.vstack([
@@ -135,7 +135,7 @@ class PurePursuitPlanner(Controller):
         nearest_p, nearest_dist, t, i = nearest_point(position, self.waypoints[:, 0:2])
         if nearest_dist < lookahead_distance:
             self.lookahead_point, self.target_index, t2 = intersect_point(
-                position,
+                position.astype(np.float32),
                 lookahead_distance,
                 self.waypoints[:, 0:2],
                 np.float32(i + t),

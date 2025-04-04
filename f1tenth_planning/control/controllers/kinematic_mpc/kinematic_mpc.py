@@ -143,4 +143,7 @@ class Kinematic_MPC_Planner(Controller):
         )
         self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj, Q, P, R, Rd)
 
+        self.local_plan = self.ref_traj[:2].T
+        self.control_solution = self.x_pred[:2].T
+
         return self.u_pred[:, 0]

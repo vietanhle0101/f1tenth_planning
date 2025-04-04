@@ -271,5 +271,6 @@ class LQRController(Controller):
             self.config.max_iterations, 
             self.config.eps
         )
-
+        self.local_plan = self.waypoints[self.target_index : self.target_index + 10, :2]
+        self.control_solution = self.closest_point[:2][None]
         return steering_angle, speed

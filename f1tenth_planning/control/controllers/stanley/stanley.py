@@ -213,7 +213,7 @@ class StanleyController(Controller):
         if k_path is not None:
             self.k_path = k_path
 
-        k_path = np.float32(k_path)
+        k_path = np.float32(self.k_path)
         vehicle_state = np.array([
             state["pose_x"], 
             state["pose_y"], 
@@ -222,4 +222,7 @@ class StanleyController(Controller):
         ])
 
         steering_angle, speed = self.controller(vehicle_state, self.waypoints, k_path)
+
+        self.local_plan = self.waypoints[self.target_index : self.target_index + 5, :2]
+        self.control_solution = self.target_point[:2][None]
         return steering_angle, speed

@@ -164,4 +164,7 @@ class Kinematic_NMPC_Planner(Controller):
         )
         self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj)
 
+        self.local_plan = self.ref_traj[:2].T
+        self.control_solution = np.array(self.x_pred[:2, :]).T
+
         return np.array(self.u_pred[:, 0]).flatten()
