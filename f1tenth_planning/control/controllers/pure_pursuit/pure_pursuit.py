@@ -32,6 +32,7 @@ from f1tenth_planning.utils.utils import nearest_point
 from f1tenth_planning.utils.utils import intersect_point
 from f1tenth_planning.utils.utils import get_actuation
 from f1tenth_planning.control.controller import Controller
+from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1tenth_params
 
 import numpy as np
@@ -59,7 +60,8 @@ class PurePursuitPlanner(Controller):
     """
 
     def __init__(self, track: Track, params: dynamics_config = f1tenth_params(), lookahead_distance=0.8, max_reacquire=20.0):
-        super(PurePursuitPlanner, self).__init__(track, params)
+        super(PurePursuitPlanner, self).__init__(track, params, 
+                                                 control_mode=(SteerActionEnum.Steering_Angle, LongitudinalActionEnum.Speed))
         self.waypoints = np.vstack([
             track.raceline.xs,
             track.raceline.ys,
@@ -102,7 +104,14 @@ class PurePursuitPlanner(Controller):
             e: The environment renderer instance used for drawing.
         """
         if self.target_index is not None:
-            self.local_plan = self.waypoints[self.target_index : self.target_index + 10, :2]
+            end_index = self.target_index + 10
+            if end_index > self.waypoints.shape[0]:
+                self.local_plan = np.vstack((
+                self.waypoints[self.target_index:, :2],
+                self.waypoints[:end_index % self.waypoints.shape[0], :2]
+                ))
+            else:
+                self.local_plan = self.waypoints[self.target_index:end_index, :2]
             if self.local_plan_render is None:
                 self.local_plan_render = e.render_closed_lines(
                     self.local_plan, color=(0, 0, 128), size=1
@@ -143,6 +152,7 @@ class PurePursuitPlanner(Controller):
             )
             return current_waypoint
         elif nearest_dist < self.max_reacquire:
+            self.target_index = i
             return self.waypoints[i, :]
         else:
             return None
@@ -199,5 +209,15 @@ class PurePursuitPlanner(Controller):
             lookahead_distance,
             self.params.WHEELBASE,
         )
+
+        end_index = self.target_index + 10
+        if end_index > self.waypoints.shape[0]:
+            self.local_plan = np.vstack((
+            self.waypoints[self.target_index:, :2],
+            self.waypoints[:end_index % self.waypoints.shape[0], :2]
+            ))
+        else:
+            self.local_plan = self.waypoints[self.target_index:end_index, :2]
+        self.control_solution = self.lookahead_point[:2][None]
 
         return steering_angle, speed

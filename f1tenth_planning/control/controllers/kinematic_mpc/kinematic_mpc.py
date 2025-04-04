@@ -5,6 +5,7 @@ from f1tenth_planning.utils.utils import calc_interpolated_reference_trajectory
 from f1tenth_planning.control.dynamics_models.kinematic_model import Kinematic_Bicycle_Model
 from f1tenth_planning.control.controllers.LTV_mpc.LTV_mpc import LTV_MPC_Solver
 from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1tenth_params
+from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 from f1tenth_gym.envs.track import Track
 
 import numpy as np
@@ -17,7 +18,8 @@ class Kinematic_MPC_Planner(Controller):
         params: dynamics_config = f1tenth_params(), 
         config=kinematic_mpc_config(),
     ):
-        super(Kinematic_MPC_Planner, self).__init__(track, params)
+        super(Kinematic_MPC_Planner, self).__init__(track, params,
+                                                        control_mode=(SteerActionEnum.Steering_Speed, LongitudinalActionEnum.Accl))
         self.config = config
         self.waypoints = np.vstack([
             track.raceline.xs,                 # x

@@ -4,10 +4,11 @@ from abc import abstractmethod, ABC
 import numpy as np
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.config.dynamics_config import dynamics_config
+from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 
 class Controller(ABC):
     @abstractmethod
-    def __init__(self, track: Track, params: dynamics_config) -> None:
+    def __init__(self, track: Track, params: dynamics_config, control_mode : tuple[SteerActionEnum, LongitudinalActionEnum]) -> None:
         """
         Initialize controller.
 
@@ -17,6 +18,7 @@ class Controller(ABC):
         """
         self.track = track
         self.params = params
+        self.control_mode = control_mode
         self.waypoints = None
         self.waypoint_render = None
 

@@ -28,6 +28,7 @@ Last Modified: 5/1/22
 """
 
 from f1tenth_gym.envs.track import Track
+from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1tenth_params
 from f1tenth_planning.control.controller import Controller
 from f1tenth_planning.utils.utils import nearest_point
@@ -63,7 +64,8 @@ class StanleyController(Controller):
     """
 
     def __init__(self, track: Track, params: dynamics_config = f1tenth_params(), k_path=5.0):
-        super(StanleyController, self).__init__(track, params)
+        super(StanleyController, self).__init__(track, params, 
+                                                 control_mode=(SteerActionEnum.Steering_Angle, LongitudinalActionEnum.Speed))
         self.waypoints = np.vstack([
             track.raceline.xs,
             track.raceline.ys,

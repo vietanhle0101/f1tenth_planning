@@ -10,6 +10,7 @@ from f1tenth_planning.control.config.solver_config import solver_config
 from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1tenth_params
 from f1tenth_planning.control.dynamics_models.dynamic_model import Dynamic_Bicycle_Model
 from f1tenth_planning.control.controllers.nonlinear_mpc.nonlinear_mpc import Nonlinear_MPC_Solver
+from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 
 class Dynamic_NMPC_Planner(Controller):
     """
@@ -27,7 +28,8 @@ class Dynamic_NMPC_Planner(Controller):
         params: dynamics_config = f1tenth_params(), 
         config=dynamic_mpc_config(),
     ):
-        super(Dynamic_NMPC_Planner, self).__init__(track, params)
+        super(Dynamic_NMPC_Planner, self).__init__(track, params,
+                                                        control_mode=(SteerActionEnum.Steering_Speed, LongitudinalActionEnum.Accl))
         self.config = config
         self.waypoints = np.vstack([
             track.raceline.xs,                 # x
