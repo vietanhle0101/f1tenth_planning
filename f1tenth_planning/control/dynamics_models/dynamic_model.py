@@ -81,11 +81,8 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
 
         return np.array([dx, dy, ddelta, dv, dyaw, ddyaw, dslip_angle])
     
-    def f_casadi(self, params = None):
-        if params is not None:
-            self.params = params
-
-            
+    def f_casadi(self) -> ca.Function:
+        # State symbolic variables
         x = ca.SX.sym('x')
         y = ca.SX.sym('y')
         delta = ca.SX.sym('delta')
@@ -110,12 +107,33 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
             a
         )
 
-        params_vector = self.parameters_vector_from_config(self.params)
-        RHS = self.f_casadi_opti(states, controls, params_vector)
+        # parameters symbolic variables
+        mu = ca.SX.sym('mu')
+        m = ca.SX.sym('m')
+        I = ca.SX.sym('I')
+        lr = ca.SX.sym('lr')
+        lf = ca.SX.sym('lf')
+        C_Sf = ca.SX.sym('C_Sf')
+        C_Sr = ca.SX.sym('C_Sr')
+        h = ca.SX.sym('h')
+        g = ca.SX.sym('g')
+        params = ca.vertcat(
+            mu,
+            m,
+            I,
+            lr,
+            lf,
+            C_Sf,
+            C_Sr,
+            h,
+            g
+        )
 
-        # maps controls from [va, vb, vc, vd].T to [vx, vy, omega].T
-        f = ca.Function('f', [states, controls], [RHS])
+        # right-hand side of the equation
+        RHS = self.f_casadi_opti(states, controls, params)
 
+        # maps controls, states and parameters to the right-hand side of the equation
+        f = ca.Function('f', [states, controls, params], [RHS])
         return f
         
     def f_casadi_opti(self, state: ca.SX, control: ca.SX, params: ca.SX) -> ca.SX:
@@ -128,7 +146,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         C_Sf = params[5]
         C_Sr = params[6]
         h = params[7]
-        g = 9.81
+        g = params[8]
         
         # Extract state variables from x 
         x = state[0]
@@ -149,18 +167,21 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
                             v * ca.sin(slip_angle) * ca.tan(delta) * d_beta_slow  +
                             v * ca.cos(slip_angle) * delta_v / (ca.cos(delta) ** 2))
         
+        epsilon = 1e-4
         dyaw_fast = yaw_rate                # dyaw/dt = yaw_rate
-        dyaw_rate_fast = -mu * m / (v * I * (lr + lf) + 0.05) * (
-                                        lf ** 2 * C_Sf * (g * lr - a * h) + lr ** 2 * C_Sr * (g * lf + a * h)) * yaw_rate \
-                            + mu * m / (I * (lr + lf)) * (lr * C_Sr * (g * lf + a * h) - lf * C_Sf * (g * lr - a * h)) * slip_angle \
-                            + mu * m / (I * (lr + lf)) * lf * C_Sf * (g * lr - a * h) * delta # dyaw_rate/dt = RHS
-        d_beta_fast = (mu / (v ** 2 * (lr + lf) + 0.05) * (C_Sr * (g * lf + a * h) * lr - C_Sf * (g * lr - a * h) * lf) - 1) * yaw_rate \
-                            - mu / (v * (lr + lf) + 0.05) * (C_Sr * (g * lf + a * h) + C_Sf * (g * lr - a * h)) * slip_angle \
-                            + mu / (v * (lr + lf) + 0.05) * (C_Sf * (g * lr - a * h)) * delta    # dbeta/dt = RHS
+        glr = g * lr - a * h
+        glf = g * lf + a * h
+        dyaw_rate_fast = mu * m / (I * (lr + lf)) * (
+                            lf * C_Sf * (glr) * delta + (lr * C_Sr * (glf) - lf * C_Sf * (glr)) * slip_angle \
+                            - (lf ** 2 * C_Sf * (glr) + lr ** 2 * C_Sr * (glf)) * (yaw_rate / (v + epsilon)))
         
+        d_beta_fast = (mu / ((v + epsilon) * (lf + lr))) * (
+                        C_Sf * (glr) * delta - (C_Sr * (glf) + C_Sf * (glr)) * slip_angle \
+                        + (C_Sr * (glf) * lr - C_Sf * (glr) * lf) * (yaw_rate / (v + epsilon)))  - yaw_rate
+                                                            
         RHS_LOW_SPEED = ca.vertcat(
-                            v * ca.cos(yaw + slip_angle),  # dx/dt = v * cos(yaw + slip_angle)
-                            v * ca.sin(yaw + slip_angle),  # dy/dt = v * sin(yaw + slip_angle)
+                            v * ca.cos(yaw),  # dx/dt = v * cos(yaw + slip_angle)
+                            v * ca.sin(yaw),  # dy/dt = v * sin(yaw + slip_angle)
                             delta_v,                 # d(delta)/dt = delta_v
                             a,                       # dv/dt = a
                             dyaw_slow,  # dyaw/dt = yaw_rate
