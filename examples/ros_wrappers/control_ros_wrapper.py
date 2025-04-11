@@ -6,6 +6,7 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 # Change your controller
+# from f1tenth_planning.control import Nonlinear_Dynamic_MPC_Planner as RoboracerController
 from f1tenth_planning.control import Nonlinear_Kinemtic_MPC_Planner as RoboracerController
 from f1tenth_planning.utils.utils import input_steering_speed_to_angle, input_acceleration_to_speed
 from f1tenth_gym.envs.track import Track
@@ -18,6 +19,14 @@ from ackermann_msgs.msg import AckermannDriveStamped
 from visualization_msgs.msg import MarkerArray, Marker
 from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy,DurabilityPolicy, LivelinessPolicy
 from rclpy.node import Node
+
+try:
+    from context_msgs.msg import STControl, STState, STCombined
+
+    GT_STATE_PUB = True
+except ImportError:
+    GT_STATE_PUB = False
+    print("context_msgs not found, GT_STATE_PUB will not be used.")
 
 class ControlRosWrapper(Node):
     def __init__(self):
@@ -47,11 +56,16 @@ class ControlRosWrapper(Node):
             durability=DurabilityPolicy.VOLATILE,
             liveliness=LivelinessPolicy.AUTOMATIC,
             depth=1)
-
-        odom_topic = '/fixposition/odometry' # '/ego_racecar/odom' for f1tenth_gym, '/pf/pose/odom' for f1tenth car
-        self.pose_sub = self.create_subscription(
-            Odometry, odom_topic, self.pose_callback, qos_profile
-        )
+        
+        if not GT_STATE_PUB:
+            odom_topic = '/fixposition/odometry' # '/ego_racecar/odom' for f1tenth_gym, '/pf/pose/odom' for f1tenth car
+            self.pose_sub = self.create_subscription(
+                Odometry, odom_topic, self.pose_callback, qos_profile
+            )
+        else:
+            self.pose_sub = self.create_subscription(
+                STCombined, "/ground_truth/combined", self.pose_callback, qos_profile
+            )
         
         self.delta = 0.0
         self.local_plan_pub = self.create_publisher(MarkerArray, "/local_plan", 10)
@@ -110,26 +124,38 @@ class ControlRosWrapper(Node):
         self.global_plan_pub.publish(self.global_plan_marker_array)
 
     def pose_callback(self, pose_msg : Odometry):
-        # Get pose
-        x = pose_msg.pose.pose.position.x
-        y = pose_msg.pose.pose.position.y
+        if GT_STATE_PUB:
+            self.delta = pose_msg.control.steering_angle
+            state_dict = {
+                "pose_x": pose_msg.state.x,
+                "pose_y": pose_msg.state.y,
+                "delta": self.delta,
+                "linear_vel_x": pose_msg.state.velocity,
+                "pose_theta": pose_msg.state.yaw,
+                "ang_vel_z": pose_msg.state.yaw_rate,
+                "beta": pose_msg.state.slip_angle
+            }
+        else:
+            # Get pose
+            x = pose_msg.pose.pose.position.x
+            y = pose_msg.pose.pose.position.y
 
-        pose = pose_msg.pose.pose
-        twist = pose_msg.twist.twist
-        beta = np.arctan2(twist.linear.y, twist.linear.x)
-        quaternion = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
-        euler = R.from_quat(quaternion).as_euler('xyz', degrees=False)
-        theta = euler[2]  # Yaw is the third element
+            pose = pose_msg.pose.pose
+            twist = pose_msg.twist.twist
+            beta = np.arctan2(twist.linear.y, twist.linear.x)
+            quaternion = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
+            euler = R.from_quat(quaternion).as_euler('xyz', degrees=False)
+            theta = euler[2]  # Yaw is the third element
 
-        state_dict = {
-            "pose_x": x,
-            "pose_y": y,
-            "delta": self.delta,
-            "linear_vel_x": twist.linear.x,
-            "pose_theta": theta,
-            "ang_vel_z": twist.angular.z,
-            "beta": beta
-        }
+            state_dict = {
+                "pose_x": x,
+                "pose_y": y,
+                "delta": self.delta,
+                "linear_vel_x": twist.linear.x,
+                "pose_theta": theta,
+                "ang_vel_z": twist.angular.z,
+                "beta": beta
+            }
 
         # Plan control commands
         steer_v, accel = self.planner.plan(state_dict)
@@ -139,7 +165,7 @@ class ControlRosWrapper(Node):
         
         # Convert steer_v and accel to steering angle and speed
         steer = input_steering_speed_to_angle(self.delta, steer_v, self.planner.config.dt)
-        speed = input_acceleration_to_speed(accel, twist.linear.x, self.planner.config.dt)
+        speed = input_acceleration_to_speed(accel, state_dict["linear_vel_x"], self.planner.config.dt)
 
         self.delta = steer
         # Publish control commands

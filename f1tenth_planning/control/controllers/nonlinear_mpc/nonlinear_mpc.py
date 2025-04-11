@@ -38,7 +38,7 @@ class Nonlinear_MPC_Solver:
         U = ca.SX.sym('U', self.config.nu, self.config.N)
 
         # coloumn vector for storing initial state and target state
-        Params = ca.SX.sym('Params', self.config.nx, self.config.N+1)
+        Params = ca.SX.sym('Params', self.config.nx + self.model.num_params, self.config.N+1)
 
         # state weights matrix converted from config Qk
         Q = ca.diagcat(*np.diag(self.config.Q))
@@ -46,32 +46,35 @@ class Nonlinear_MPC_Solver:
         # controls weights matrix
         R = ca.diagcat(*np.diag(self.config.R))
 
-        states = ca.SX.sym('states', self.config.nx, 1)
-        controls = ca.SX.sym('controls', self.config.nu, 1)
-        
         # System dynamics function
         f = self.model.f_casadi()
 
         cost_fn = 0  # cost function
-        g = X[:, 0] - Params[:, 0]  # x(0) = x0 constraint in the equation
+        g = X[:, 0] - Params[:self.config.nx, 0]  # x(0) = x0 constraint in the equation
 
         # loop over all time steps
         for k in range(self.config.N):
             st = X[:, k]
             con = U[:, k]
+            params = Params[self.config.nx:, k]
 
             # state tracking cost + input cost
             cost_fn = cost_fn \
-                + (st - Params[:, k+1]).T @ Q @ (st - Params[:, k+1]) \
+                + (st - Params[:self.config.nx, k]).T @ Q @ (st - Params[:self.config.nx, k]) \
                 + con.T @ R @ con    
             
             # state dynamics constraint
             st_next = X[:, k+1]
-            st_next_RK4 = self.discretizer(f, st, con, self.config.DT)
+            st_next_RK4 = self.discretizer(f, st, con, params, self.config.DT)
             g = ca.vertcat(g, st_next - st_next_RK4)
 
+        # terminal cost
+        st = X[:, self.config.N]
+        cost_fn = cost_fn \
+            + (st - Params[:self.config.nx, self.config.N]).T @ Q @ (st - Params[:self.config.nx, self.config.N])
+    
         OPT_variables = ca.vertcat(
-            X.reshape((-1, 1)),   # Example: 3x11 ---> 33x1 where 3=states, 11=N+1
+            X.reshape((-1, 1)),
             U.reshape((-1, 1))
         )
         nlp_prob = {
@@ -113,11 +116,31 @@ class Nonlinear_MPC_Solver:
 
         return
     
-    def solve(self, x0, xref):
-        self.args['p'] = ca.horzcat(
+    def solve(self, x0, xref, p=None):
+        params_x = ca.horzcat(
             x0,    # current state
             xref[:, 1:]  # reference states
         )
+        params_p = None
+        # Only update parameters if they are provided
+        if p is not None:
+            if p.shape[0] != self.model.num_params:
+                raise ValueError(f"Expected {self.model.num_params} parameters, got {p.shape[0]}")
+            if p.shape[1] == 1:
+                p = ca.repmat(p, 1, self.config.N + 1)
+            elif p.shape[1] != self.config.N + 1:
+                raise ValueError(f"Expected {self.config.N + 1} columns for parameters, got {p.shape[1]}")
+        else:
+            p = self.model.parameters_vector_from_config(self.model.params)
+            p = ca.repmat(p, 1, self.config.N + 1)
+        
+        params_p = ca.DM(p)
+    
+        self.args['p'] = ca.vertcat(
+            params_x,
+            params_p
+        )
+    
         # optimization variable current state
         self.args['x0'] = ca.vertcat(
             ca.reshape(ca.repmat(x0, 1, self.config.N+1), self.config.nx*(self.config.N+1), 1),
