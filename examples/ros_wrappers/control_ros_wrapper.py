@@ -10,7 +10,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from f1tenth_planning.control import Nonlinear_Kinemtic_MPC_Planner as RoboracerController
 from f1tenth_planning.utils.utils import input_steering_speed_to_angle, input_acceleration_to_speed
 from f1tenth_gym.envs.track import Track
-from f1tenth_planning.control.config.dynamics_config import fullscale_params
+from f1tenth_planning.control.config.dynamics_config import fullscale_params, update_config_from_dict
 
 import rclpy
 from scipy.spatial.transform import Rotation as R
@@ -22,6 +22,7 @@ from rclpy.node import Node
 
 try:
     from context_msgs.msg import STControl, STState, STCombined
+    from context_msgs.msg import ParamList
 
     GT_STATE_PUB = True
 except ImportError:
@@ -67,6 +68,10 @@ class ControlRosWrapper(Node):
                 STCombined, "/ground_truth/combined", self.pose_callback, qos_profile
             )
         
+        self.param_sub = self.create_subscription(
+            ParamList, "/estimates/current", self.param_update_callback, 10
+        )
+
         self.delta = 0.0
         self.local_plan_pub = self.create_publisher(MarkerArray, "/local_plan", 10)
         self.mpc_solution_pub = self.create_publisher(MarkerArray, "/mpc_solution", 10)
@@ -173,6 +178,14 @@ class ControlRosWrapper(Node):
         drive_msg.drive.steering_angle = steer
         drive_msg.drive.speed = speed
         self.drive_pub.publish(drive_msg)
+
+    def param_update_callback(self, param_msg : ParamList):
+        # Create a dict from param_msg.Params
+        param_dict = {}
+        for param in param_msg.params:
+            param_dict[param.name] = param.value
+        # Update the planner parameters, will be updated internally if supported by controller
+        update_config_from_dict(self.planner.config, param_dict)
 
 def main(args=None):
     rclpy.init(args=args)
