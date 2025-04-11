@@ -11,6 +11,7 @@ from f1tenth_planning.control import Nonlinear_Kinemtic_MPC_Planner as Roboracer
 from f1tenth_planning.utils.utils import input_steering_speed_to_angle, input_acceleration_to_speed
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.config.dynamics_config import fullscale_params, update_config_from_dict
+from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 
 import rclpy
 from scipy.spatial.transform import Rotation as R
@@ -163,14 +164,22 @@ class ControlRosWrapper(Node):
             }
 
         # Plan control commands
-        steer_v, accel = self.planner.plan(state_dict)
+        steer_action, longitudtinal_action = self.planner.plan(state_dict)
 
         self.publish_visualizations(np.array(self.planner.ref_traj[:2].T),
                                     np.array(self.planner.x_pred[:2, :].T))
         
-        # Convert steer_v and accel to steering angle and speed
-        steer = input_steering_speed_to_angle(self.delta, steer_v, self.planner.config.dt)
-        speed = input_acceleration_to_speed(accel, state_dict["linear_vel_x"], self.planner.config.dt)
+        # Convert steer_action to steering angle if needed
+        if self.planner.control_mode[0] == SteerActionEnum.Steering_Speed:
+            steer = input_steering_speed_to_angle(self.delta, steer_action, self.planner.config.dt)
+        else:
+            steer = steer_action # Already a steering angle action
+
+        # Convert longitudinal_action to speed if needed
+        if self.planner.control_mode[1] == LongitudinalActionEnum.Acceleration:
+            speed = input_acceleration_to_speed(longitudtinal_action, state_dict["linear_vel_x"], self.planner.config.dt)
+        else:
+            speed = longitudtinal_action # Already a speed action
 
         self.delta = steer
         # Publish control commands

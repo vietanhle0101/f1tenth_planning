@@ -53,7 +53,7 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
         return np.array([dx, dy, ddelta, dv, dyaw])
     
     def f_casadi(self) -> ca.Function:
-        # Sstate symbolic variables
+        # State symbolic variables
         x = ca.SX.sym('x')
         y = ca.SX.sym('y')
         delta = ca.SX.sym('delta')
