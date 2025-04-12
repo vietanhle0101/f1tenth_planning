@@ -171,10 +171,12 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         dyaw_fast = yaw_rate                # dyaw/dt = yaw_rate
         glr = g * lr - a * h
         glf = g * lf + a * h
-        dyaw_rate_fast = mu * m / (I * (lr + lf)) * (
-                            lf * C_Sf * (glr) * delta + (lr * C_Sr * (glf) - lf * C_Sf * (glr)) * slip_angle \
-                            - (lf ** 2 * C_Sf * (glr) + lr ** 2 * C_Sr * (glf)) * (yaw_rate / (v + epsilon)))
-        
+        # system dynamics
+        dyaw_rate_fast = (mu * m/ (I * (lr + lf))) * (
+                            lf * C_Sf * (glr) * delta
+                            + (lr * C_Sr * (glf) - lf * C_Sf * (glr)) * slip_angle
+                            - (lf ** 2 * C_Sf * (glr) + lr ** 2 * C_Sr * (glf)) * (yaw_rate / (v + epsilon))
+                        )
         d_beta_fast = (mu / ((v + epsilon) * (lf + lr))) * (
                         C_Sf * (glr) * delta - (C_Sr * (glf) + C_Sf * (glr)) * slip_angle \
                         + (C_Sr * (glf) * lr - C_Sf * (glr) * lf) * (yaw_rate / (v + epsilon)))  - yaw_rate
@@ -199,7 +201,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
                             d_beta_fast                   # dbeta/dt = d_beta
                         ) # dx/dt = f(x,u)
 
-        RHS = ca.if_else(v >= 3.0, RHS_HIGH_SPEED, RHS_LOW_SPEED)
+        RHS = ca.if_else(v >= 0.5, RHS_HIGH_SPEED, RHS_LOW_SPEED)
 
         return RHS
     
@@ -213,7 +215,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
             params.C_SF,
             params.C_SR,
             params.H,
-            params.MU,
+            9.81
         ])
 
     @property
