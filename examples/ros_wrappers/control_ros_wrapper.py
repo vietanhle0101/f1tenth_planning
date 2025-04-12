@@ -6,8 +6,8 @@ import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 # Change your controller
-# from f1tenth_planning.control import Nonlinear_Dynamic_MPC_Planner as RoboracerController
-from f1tenth_planning.control import Nonlinear_Kinemtic_MPC_Planner as RoboracerController
+from f1tenth_planning.control import Nonlinear_Dynamic_MPC_Planner as RoboracerController
+# from f1tenth_planning.control import Nonlinear_Kinemtic_MPC_Planner as RoboracerController
 from f1tenth_planning.utils.utils import input_steering_speed_to_angle, input_acceleration_to_speed
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.config.dynamics_config import fullscale_params, update_config_from_dict
@@ -176,7 +176,7 @@ class ControlRosWrapper(Node):
             steer = steer_action # Already a steering angle action
 
         # Convert longitudinal_action to speed if needed
-        if self.planner.control_mode[1] == LongitudinalActionEnum.Acceleration:
+        if self.planner.control_mode[1] == LongitudinalActionEnum.Accl:
             speed = input_acceleration_to_speed(longitudtinal_action, state_dict["linear_vel_x"], self.planner.config.dt)
         else:
             speed = longitudtinal_action # Already a speed action
