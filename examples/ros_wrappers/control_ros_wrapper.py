@@ -4,13 +4,25 @@ from f1tenth_gym.envs import F110Env
 import time
 import os
 import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 # Change your controller
-from f1tenth_planning.control import Nonlinear_Dynamic_MPC_Planner as RoboracerController
-# from f1tenth_planning.control import Nonlinear_Kinemtic_MPC_Planner as RoboracerController
-from f1tenth_planning.utils.utils import input_steering_speed_to_angle, input_acceleration_to_speed
+from f1tenth_planning.control import (
+    Nonlinear_Dynamic_MPC_Planner as RoboracerController,
+)
+
+# from f1tenth_planning.control import (
+#     Nonlinear_Kinemtic_MPC_Planner as RoboracerController,
+# )
+from f1tenth_planning.utils.utils import (
+    input_steering_speed_to_angle,
+    input_acceleration_to_speed,
+)
 from f1tenth_gym.envs.track import Track
-from f1tenth_planning.control.config.dynamics_config import fullscale_params, update_config_from_dict
+from f1tenth_planning.control.config.dynamics_config import (
+    fullscale_params,
+    update_config_from_dict,
+)
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 
 import rclpy
@@ -18,7 +30,13 @@ from scipy.spatial.transform import Rotation as R
 from nav_msgs.msg import Odometry
 from ackermann_msgs.msg import AckermannDriveStamped
 from visualization_msgs.msg import MarkerArray, Marker
-from rclpy.qos import QoSProfile, QoSHistoryPolicy, QoSReliabilityPolicy,DurabilityPolicy, LivelinessPolicy
+from rclpy.qos import (
+    QoSProfile,
+    QoSHistoryPolicy,
+    QoSReliabilityPolicy,
+    DurabilityPolicy,
+    LivelinessPolicy,
+)
 from rclpy.node import Node
 
 try:
@@ -30,11 +48,12 @@ except ImportError:
     GT_STATE_PUB = False
     print("context_msgs not found, GT_STATE_PUB will not be used.")
 
+
 class ControlRosWrapper(Node):
     def __init__(self):
         super().__init__("control_node")
         # Load track waypoints
-        waypoints_track : Track = Track.from_raceline_file(
+        waypoints_track: Track = Track.from_raceline_file(
             os.path.join(os.path.dirname(__file__), "ros_map.csv"),
             delimiter=";",
             skip_rows=3,
@@ -45,8 +64,14 @@ class ControlRosWrapper(Node):
             np.cos(waypoints_track.raceline.yaws),
         )
 
+        # Multiply the velocity by a factor
+        waypoints_track.raceline.vxs *= 1.5
+
         # Create planner
-        self.planner = RoboracerController(track=waypoints_track, params=fullscale_params())
+        self.planner = RoboracerController(
+            track=waypoints_track, params=fullscale_params()
+        )
+        self.params = fullscale_params()
 
         # ROS publishers and subscribers
         self.drive_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
@@ -54,13 +79,14 @@ class ControlRosWrapper(Node):
         # Create a QoS profile with KeepLast policy and depth of 1
         qos_profile = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
-            history=QoSHistoryPolicy.KEEP_LAST, 
+            history=QoSHistoryPolicy.KEEP_LAST,
             durability=DurabilityPolicy.VOLATILE,
             liveliness=LivelinessPolicy.AUTOMATIC,
-            depth=1)
-        
+            depth=1,
+        )
+
         if not GT_STATE_PUB:
-            odom_topic = '/fixposition/odometry' # '/ego_racecar/odom' for f1tenth_gym, '/pf/pose/odom' for f1tenth car
+            odom_topic = "/fixposition/odometry"  # '/ego_racecar/odom' for f1tenth_gym, '/pf/pose/odom' for f1tenth car
             self.pose_sub = self.create_subscription(
                 Odometry, odom_topic, self.pose_callback, qos_profile
             )
@@ -68,21 +94,35 @@ class ControlRosWrapper(Node):
             self.pose_sub = self.create_subscription(
                 STCombined, "/ground_truth/combined", self.pose_callback, qos_profile
             )
-        
+
         self.param_sub = self.create_subscription(
             ParamList, "/estimates/current", self.param_update_callback, 10
         )
 
         self.delta = 0.0
-        self.local_plan_pub = self.create_publisher(MarkerArray, "/local_plan", 10)
-        self.mpc_solution_pub = self.create_publisher(MarkerArray, "/mpc_solution", 10)
-        self.global_plan_pub = self.create_publisher(MarkerArray, "/global_plan", 10)
+        self.local_plan_pub = self.create_publisher(
+            MarkerArray, "/control/local_plan", 10
+        )
+        self.mpc_solution_pub = self.create_publisher(
+            MarkerArray, "/control/mpc_solution", 10
+        )
+        self.global_plan_pub = self.create_publisher(
+            MarkerArray, "/control/global_plan", 10
+        )
 
-        self.global_plan_marker_array = self._init_marker_array(self.planner.waypoints.shape[0], color=(0.0, 0.0, 1.0))
-        self.global_plan_marker_array = self._update_marker_array(self.global_plan_marker_array, self.planner.waypoints)
+        self.global_plan_marker_array = self._init_marker_array(
+            self.planner.waypoints.shape[0], color=(0.0, 0.0, 1.0)
+        )
+        self.global_plan_marker_array = self._update_marker_array(
+            self.global_plan_marker_array, self.planner.waypoints
+        )
 
-        self.local_plan_marker_array = self._init_marker_array(self.planner.config.N + 1, color=(0.0, 1.0, 0.0))
-        self.mpc_solution_marker_array = self._init_marker_array(self.planner.config.N, color=(1.0, 0.0, 0.0))
+        self.local_plan_marker_array = self._init_marker_array(
+            self.planner.config.N + 1, color=(0.0, 1.0, 0.0)
+        )
+        self.mpc_solution_marker_array = self._init_marker_array(
+            self.planner.config.N, color=(1.0, 0.0, 0.0)
+        )
 
     def _init_marker_array(self, num_markers, color=(1.0, 0.0, 1.0)):
         marker_array = MarkerArray()
@@ -108,28 +148,32 @@ class ControlRosWrapper(Node):
             marker.color.b = color[2]
             marker_array.markers.append(marker)
         return marker_array
-    
-    def _update_marker_array(self, marker_array : MarkerArray, points):
+
+    def _update_marker_array(self, marker_array: MarkerArray, points):
         num_update = len(points)
-        if(len(marker_array.markers) < len(points)):
+        if len(marker_array.markers) < len(points):
             num_update = len(marker_array.markers)
-            
+
         for i in range(num_update):
-            marker : Marker = marker_array.markers[i]
+            marker: Marker = marker_array.markers[i]
             marker.pose.position.x = float(points[i][0])
             marker.pose.position.y = float(points[i][1])
         for i in range(num_update, len(marker_array.markers)):
             marker = marker_array.markers[i]
             marker.action = Marker.DELETE
-            
+
         return marker_array
-    
+
     def publish_visualizations(self, local_plan, mpc_solution):
-        self.local_plan_pub.publish(self._update_marker_array(self.local_plan_marker_array, local_plan))
-        self.mpc_solution_pub.publish(self._update_marker_array(self.mpc_solution_marker_array, mpc_solution))
+        self.local_plan_pub.publish(
+            self._update_marker_array(self.local_plan_marker_array, local_plan)
+        )
+        self.mpc_solution_pub.publish(
+            self._update_marker_array(self.mpc_solution_marker_array, mpc_solution)
+        )
         self.global_plan_pub.publish(self.global_plan_marker_array)
 
-    def pose_callback(self, pose_msg : Odometry):
+    def pose_callback(self, pose_msg: Odometry):
         if GT_STATE_PUB:
             self.delta = pose_msg.control.steering_angle
             state_dict = {
@@ -139,7 +183,7 @@ class ControlRosWrapper(Node):
                 "linear_vel_x": pose_msg.state.velocity,
                 "pose_theta": pose_msg.state.yaw,
                 "ang_vel_z": pose_msg.state.yaw_rate,
-                "beta": pose_msg.state.slip_angle
+                "beta": pose_msg.state.slip_angle,
             }
         else:
             # Get pose
@@ -149,8 +193,13 @@ class ControlRosWrapper(Node):
             pose = pose_msg.pose.pose
             twist = pose_msg.twist.twist
             beta = np.arctan2(twist.linear.y, twist.linear.x)
-            quaternion = [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w]
-            euler = R.from_quat(quaternion).as_euler('xyz', degrees=False)
+            quaternion = [
+                pose.orientation.x,
+                pose.orientation.y,
+                pose.orientation.z,
+                pose.orientation.w,
+            ]
+            euler = R.from_quat(quaternion).as_euler("xyz", degrees=False)
             theta = euler[2]  # Yaw is the third element
 
             state_dict = {
@@ -160,41 +209,42 @@ class ControlRosWrapper(Node):
                 "linear_vel_x": twist.linear.x,
                 "pose_theta": theta,
                 "ang_vel_z": twist.angular.z,
-                "beta": beta
+                "beta": beta,
             }
 
         # Plan control commands
-        steer_action, longitudtinal_action = self.planner.plan(state_dict)
+        action, info = self.planner.plan(state_dict, params=self.params)
+        steer_action = action[0]
+        longitudtinal_action = action[1]
 
-        self.publish_visualizations(np.array(self.planner.ref_traj[:2].T),
-                                    np.array(self.planner.x_pred[:2, :].T))
-        
+        self.publish_visualizations(
+            np.array(self.planner.ref_traj[:2].T),
+            np.array(self.planner.x_pred[:2, :].T),
+        )
+
         # Convert steer_action to steering angle if needed
-        if self.planner.control_mode[0] == SteerActionEnum.Steering_Speed:
-            steer = input_steering_speed_to_angle(self.delta, steer_action, self.planner.config.dt)
-        else:
-            steer = steer_action # Already a steering angle action
+        steer = float(info["steering_angle"])
 
         # Convert longitudinal_action to speed if needed
-        if self.planner.control_mode[1] == LongitudinalActionEnum.Accl:
-            speed = input_acceleration_to_speed(longitudtinal_action, state_dict["linear_vel_x"], self.planner.config.dt)
-        else:
-            speed = longitudtinal_action # Already a speed action
+        speed = float(info["velocity"])
 
         self.delta = steer
         # Publish control commands
         drive_msg = AckermannDriveStamped()
+        drive_msg.drive.steering_angle_velocity = steer_action
         drive_msg.drive.steering_angle = steer
+        drive_msg.drive.acceleration = longitudtinal_action
         drive_msg.drive.speed = speed
         self.drive_pub.publish(drive_msg)
 
-    def param_update_callback(self, param_msg : ParamList):
+    def param_update_callback(self, param_msg: ParamList):
         # Create a dict from param_msg.Params
         param_dict = {}
         for param in param_msg.params:
             param_dict[param.name] = param.value
         # Update the planner parameters, will be updated internally if supported by controller
-        update_config_from_dict(self.planner.config, param_dict)
+        update_config_from_dict(self.params, param_dict)
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -204,6 +254,7 @@ def main(args=None):
 
     control_node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

@@ -17,6 +17,7 @@ class mpc_config:
         P (np.ndarray): Terminal cost matrix.
         dt (float): Time discretization interval.
     """
+
     nx: int
     nu: int
     N: int
@@ -32,31 +33,33 @@ class mpc_config:
     u_max: np.ndarray = field(default=None)
     ud_min: np.ndarray = field(default=None)
     ud_max: np.ndarray = field(default=None)
-  
+
+
 def kinematic_mpc_config():
     # [x, y, delta, v, yaw]
     return mpc_config(
         nx=5,
         nu=2,
-        N=10,
+        N=15,
         Q=np.diag([18.0, 18.0, 0.0, 1.2, 18.0]),
         R=np.diag([0.01, 0.4]),
         Rd=np.diag([0.002, 0.01]),
         P=np.diag([18.0, 18.0, 0.0, 1.2, 18.0]),
-        dt=0.1
+        dt=0.1,
     )
-    
+
+
 def dynamic_mpc_config():
     # [x, y, delta, v, yaw, yaw_rate, beta]
     return mpc_config(
         nx=7,
         nu=2,
         N=10,
-        Q=np.diag([18.0, 18.0, 0.0, 10.0, 18.0, 0.0, 0.0]),
+        Q=np.diag([25.0, 25.0, 0.0, 7.0, 1000.0, 0.0, 100.0]),
         R=np.diag([0.01, 0.4]),
         Rd=np.diag([0.002, 0.01]),
-        P=np.diag([18.0, 18.0, 0.0, 10.0, 18.0, 0.0, 0.0]),
-        dt=0.1
+        P=np.diag([25.0, 25.0, 0.0, 7.0, 1000.0, 0.0, 100.0]),
+        dt=0.1,
     )
 
 
@@ -72,6 +75,7 @@ class lqr_config:
         eps (float): Tolerance for convergence.
         dt (float): Time discretization interval.
     """
+
     Q: np.ndarray = field(default=None)
     R: np.ndarray = field(default=None)
     max_iterations: int = None

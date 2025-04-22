@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 from f1tenth_gym.envs.f110_env import F110Env
 
+
 @dataclass
 class dynamics_config:
     """
     Vehicle dynamics configuration dataclass.
     This dataclass contains the vehicle dynamics parameters used for control and planning.
-    
+
     Args:
         MIN_STEER: float - minimum steering angle [rad]
         MAX_STEER: float - maximum steering angle [rad]
@@ -27,6 +28,7 @@ class dynamics_config:
         M: float - mass of the vehicle
         I: float - moment of inertia
     """
+
     MIN_STEER: float
     MAX_STEER: float
     MIN_DSTEER: float
@@ -54,11 +56,12 @@ class dynamics_config:
     M: float
     I: float
 
+
 def _dynamics_config_from_gym_params(gym_params):
     """
     Generate a dynamics configuration object from gym environment parameters.
-    This function extracts and computes various vehicle dynamics parameters 
-    from a dictionary of gym environment parameters. It also calculates 
+    This function extracts and computes various vehicle dynamics parameters
+    from a dictionary of gym environment parameters. It also calculates
     additional parameters if they are not explicitly provided in the input.
     Args:
         gym_params (dict): A dictionary containing the following keys:
@@ -88,7 +91,7 @@ def _dynamics_config_from_gym_params(gym_params):
     Returns:
         dynamics_config: An object containing the vehicle dynamics parameters. Check the `dynamics_config` class for more details.
     Notes:
-        - If certain optional parameters are not provided in `gym_params`, 
+        - If certain optional parameters are not provided in `gym_params`,
           they are computed using typical values or derived from other parameters.
         - The function assumes a gravitational acceleration of 9.81 m/s^2.
     """
@@ -123,7 +126,7 @@ def _dynamics_config_from_gym_params(gym_params):
         CF = gym_params["Cf"]
     if "cr" in gym_params:
         CR = gym_params["Cr"]
-        
+
     g = 9.81
     Fz_total = M * g
     # Distribute weight based on distances from the center of mass
@@ -177,33 +180,36 @@ def _dynamics_config_from_gym_params(gym_params):
         LR=LR,
         H=H,
         M=M,
-        I=I
+        I=I,
     )
+
 
 def f1tenth_params():
     """
     Generate a `dynamics_config` object for the f1tenth vehicle.
     This function creates a `dynamics_config` object using the default vehicle parameters
     for the f1tenth vehicle used in the F1TENTH gym.
-    
+
     Returns:
         dynamics_config: An object containing the vehicle dynamics parameters for the f1tenth vehicle.
     """
     return _dynamics_config_from_gym_params(F110Env.f1tenth_vehicle_params())
 
+
 def f1fifth_params():
     """
-    Generate a `dynamics_config` object for the f1fifth vehicle. 
+    Generate a `dynamics_config` object for the f1fifth vehicle.
     This function creates a `dynamics_config` object using the default vehicle parameters
     for the f1fifth vehicle used in the F1TENTH gym.
-    
+
     Returns:
         dynamics_config: An object containing the vehicle dynamics parameters for the f1fifth vehicle.
     """
     return _dynamics_config_from_gym_params(F110Env.f1fifth_vehicle_params())
 
+
 def fullscale_params():
-    """"
+    """ "
     Generate a `dynamics_config` object for the fullscale vehicle.
     This function creates a `dynamics_config` object using the default vehicle parameters
     for the fullscale vehicle used in the F1TENTH gym.
@@ -211,12 +217,13 @@ def fullscale_params():
     Returns:
         dynamics_config: An object containing the vehicle dynamics parameters for the fullscale vehicle.
     """
-    return _dynamics_config_from_gym_params(F110Env.fullscale_vehicle_params()) 
+    return _dynamics_config_from_gym_params(F110Env.fullscale_vehicle_params())
+
 
 def update_config_from_dict(self, config_dict):
     """
     Update the dynamics configuration object with new parameters from a dictionary.
-    
+
     Args:
         config_dict (dict): A dictionary containing the new parameters to update.
     """
