@@ -34,6 +34,44 @@ class mpc_config:
     ud_min: np.ndarray = field(default=None)
     ud_max: np.ndarray = field(default=None)
 
+@dataclass
+class mppi_config:
+    """
+    Configuration for the MPC controller. Includes the following parameters:
+
+    Args:
+        nx (int): Number of states.
+        nu (int): Number of control inputs.
+        N (int): Planning horizon for the MPC controller.
+        Q (np.ndarray): State cost matrix.
+        R (np.ndarray): Control input cost matrix.
+        Rd (np.ndarray): Control input derivative cost matrix (action rate cost).
+        P (np.ndarray): Terminal cost matrix.
+        dt (float): Time discretization interval.
+    """
+
+    nx: int
+    nu: int
+    N: int
+    Q: np.ndarray
+    R: np.ndarray
+    Rd: np.ndarray
+    P: np.ndarray
+    dt: float
+
+    # Control limits
+    u_min: np.ndarray = field(default=None)
+    u_max: np.ndarray = field(default=None)
+
+    # MPPI specific parameters
+    n_iterations: int = field(default=5)
+    n_samples: int = field(default=16)
+    temperature: float = field(default=0.01)
+    damping: float = field(default=0.001)
+    u_std: float = field(default=0.1) # std of the control noise
+    scan: bool = field(default=True)
+    adaptive_covariance: bool = field(default=False)
+
 
 def kinematic_mpc_config():
     # [x, y, delta, v, yaw]
@@ -60,6 +98,22 @@ def dynamic_mpc_config():
         Rd=np.diag([0.002, 0.01]),
         P=np.diag([25.0, 25.0, 0.0, 7.0, 1000.0, 0.0, 100.0]),
         dt=0.1,
+    )
+
+def dynamic_mppi_config():
+    # [x, y, delta, v, yaw, yaw_rate, beta]
+    return mppi_config(
+        nx=7,
+        nu=2,
+        N=10,
+        Q=np.diag([25.0, 25.0, 0.0, 7.0, 1000.0, 0.0, 100.0]),
+        R=np.diag([0.01, 0.4]),
+        Rd=np.diag([0.002, 0.01]),
+        P=np.diag([25.0, 25.0, 0.0, 7.0, 1000.0, 0.0, 100.0]),
+        dt=0.1,
+        n_iterations=1,
+        n_samples=1024,
+        adaptive_covariance=True,
     )
 
 
