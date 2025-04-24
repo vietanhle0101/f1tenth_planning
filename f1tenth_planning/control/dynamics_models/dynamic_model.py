@@ -4,6 +4,9 @@ from f1tenth_planning.control.config.dynamics_config import dynamics_config
 
 import numpy as np
 import casadi as ca
+import jax
+import jax.numpy as jnp
+
 
 
 class Dynamic_Bicycle_Model(Dynamics_Model):
@@ -153,6 +156,110 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         # maps controls, states and parameters to the right-hand side of the equation
         f = ca.Function("f", [states, controls, params], [RHS])
         return f
+    
+    @partial(jax.jit, static_argnums=(0))
+    def f_jax(self, state: jnp.ndarray, control: jnp.ndarray, params: dynamics_config) -> jnp.ndarray:
+        """
+        Single Track Dynamic Vehicle Dynamics.
+
+            Args:
+                x (numpy.ndarray (3, )): vehicle state vector (x1, x2, x3, x4, x5, x6, x7)
+                    x1: x position in global coordinates
+                    x2: y position in global coordinates
+                    x3: steering angle of front wheels
+                    x4: velocity in x direction
+                    x5: yaw angle
+                    x6: yaw rate
+                    x7: slip angle at vehicle center
+                u (numpy.ndarray (2, )): control input vector (u1, u2)
+                    u1: steering angle velocity of front wheels
+                    u2: longitudinal acceleration
+
+            Returns:
+                f (numpy.ndarray): right hand side of differential equations
+        """
+        if params is not None:
+            self.params = params
+
+        x, y, delta, v, yaw, yaw_rate, slip_angle = state
+        delta_v, a = control
+
+        # Compute the state derivative
+        dx = v * np.cos(yaw + slip_angle)
+        dy = v * np.sin(yaw + slip_angle)
+        ddelta = delta_v
+        dv = a
+
+        dyaw = 0
+        ddyaw = 0
+        dslip_angle = 0
+        
+        # derivative of yaw "kinemaitcally"
+        dyaw_ks = v * np.cos(slip_angle) / self.params.WHEELBASE * np.tan(delta)
+
+        # derivative of slip angle and yaw rate
+        dslip_angle_ks = (self.params.LR * delta_v) / (
+            self.params.WHEELBASE
+            * np.cos(delta) ** 2
+            * (1 + (np.tan(delta) * self.params.LR / self.params.WHEELBASE) ** 2)
+        )
+        ddyaw_ks = (
+            1
+            / self.params.WHEELBASE
+            * (
+                a * np.cos(slip_angle) * np.tan(delta)
+                - v * np.sin(slip_angle) * np.tan(delta) * dslip_angle_ks
+                + v * np.cos(slip_angle) * delta_v / np.cos(delta) ** 2
+            )
+        )
+        
+        dyaw_st = yaw_rate
+
+        # Extract params for more readable equations
+        mu = self.params.MU
+        m = self.params.M
+        I = self.params.I
+        lr = self.params.LR
+        lf = self.params.LF
+        C_Sf = self.params.C_SF
+        C_Sr = self.params.C_SR
+        h = self.params.H
+        g = 9.81
+
+        ddyaw_st = (
+            -mu
+            * m
+            / (v * I * (lr + lf))
+            * (lf**2 * C_Sf * (g * lr - a * h) + lr**2 * C_Sr * (g * lf + a * h))
+            * yaw_rate
+            + mu
+            * m
+            / (I * (lr + lf))
+            * (lr * C_Sr * (g * lf + a * h) - lf * C_Sf * (g * lr - a * h))
+            * slip_angle
+            + mu * m / (I * (lr + lf)) * lf * C_Sf * (g * lr - a * h) * delta
+        )
+
+        dslip_angle_st = (
+            (
+                mu
+                / (v**2 * (lr + lf))
+                * (C_Sr * (g * lf + a * h) * lr - C_Sf * (g * lr - a * h) * lf)
+                - 1
+            )
+            * yaw_rate
+            - mu
+            / (v * (lr + lf))
+            * (C_Sr * (g * lf + a * h) + C_Sf * (g * lr - a * h))
+            * slip_angle
+            + mu / (v * (lr + lf)) * (C_Sf * (g * lr - a * h)) * delta
+        )
+
+        return jax.lax.select(
+            jnp.abs(v) <= 0.1,
+            jnp.array([dx, dy, ddelta, dv, dyaw_ks, ddyaw_ks, dslip_angle_ks]),
+            jnp.array([dx, dy, ddelta, dv, dyaw_st, ddyaw_st, dslip_angle_st]),
+        )
 
     def f_casadi_opti(self, state: ca.SX, control: ca.SX, params: ca.SX) -> ca.SX:
         # Extract params for more readable equations
