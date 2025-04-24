@@ -17,15 +17,16 @@ class mpc_config:
         P (np.ndarray): Terminal cost matrix.
         dt (float): Time discretization interval.
     """
+    N: int
+    dt: float
 
     nx: int
     nu: int
-    N: int
+
     Q: np.ndarray
     R: np.ndarray
     Rd: np.ndarray
     P: np.ndarray
-    dt: float
 
     x_min: np.ndarray = field(default=None)
     x_max: np.ndarray = field(default=None)
@@ -33,6 +34,33 @@ class mpc_config:
     u_max: np.ndarray = field(default=None)
     ud_min: np.ndarray = field(default=None)
     ud_max: np.ndarray = field(default=None)
+
+    def __post_init__(self):
+        # Default x_min, x_max, u_min, u_max to infinities if not provided
+        if self.x_min is None:
+            self.x_min = -np.inf * np.ones(self.nx)
+        if self.x_max is None:
+            self.x_max = np.inf * np.ones(self.nx)
+        if self.u_min is None:
+            self.u_min = -np.inf * np.ones(self.nu)
+        if self.u_max is None:
+            self.u_max = np.inf * np.ones(self.nu)
+        if self.ud_min is None:
+            self.ud_min = -np.inf * np.ones(self.nu)
+        if self.ud_max is None:
+            self.ud_max = np.inf * np.ones(self.nu)
+
+        # Check that the dimensions of nx and nu are consistent with Q, Qf, R
+        assert self.Q.shape == (self.nx, self.nx), "Q matrix has incorrect dimensions"
+        assert self.R.shape == (self.nu, self.nu), "R matrix has incorrect dimensions"
+        assert self.P.shape == (self.nx, self.nx), "P matrix has incorrect dimensions"
+        assert self.Rd.shape == (self.nu, self.nu), "Rd matrix has incorrect dimensions"
+        assert self.x_min.shape == (self.nx,), "x_min has incorrect dimensions"
+        assert self.x_max.shape == (self.nx,), "x_max has incorrect dimensions"
+        assert self.u_min.shape == (self.nu,), "u_min has incorrect dimensions"
+        assert self.u_max.shape == (self.nu,), "u_max has incorrect dimensions"
+        assert self.ud_min.shape == (self.nu,), "ud_min has incorrect dimensions"
+        assert self.ud_max.shape == (self.nu,), "ud_max has incorrect dimensions"
 
 @dataclass
 class mppi_config:

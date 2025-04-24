@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from f1tenth_planning.control.controller import Controller
 from f1tenth_planning.control.dynamics_model import Dynamics_Model
-from f1tenth_planning.control.config.solver_config import solver_config
+from f1tenth_planning.control.config.controller_config import mpc_config
 from f1tenth_planning.control.discretizers import rk4_discretization
 from f1tenth_planning.utils.utils import nearest_point
 from f1tenth_gym.envs.track import Track
@@ -22,7 +22,7 @@ class Nonlinear_MPC_Solver:
         ipopt_opts (dict, optional): options for the IPOPT solver
     """
 
-    def __init__(self, config: solver_config, model: Dynamics_Model, ipopt_opts: dict) -> None:
+    def __init__(self, config: mpc_config, model: Dynamics_Model, ipopt_opts: dict) -> None:
         self.config = config
         self.model = model
         self.ipopt_opts = ipopt_opts

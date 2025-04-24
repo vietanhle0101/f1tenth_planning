@@ -1,7 +1,7 @@
 import math
 import cvxpy
 import numpy as np
-from f1tenth_planning.control.config.solver_config import solver_config
+from f1tenth_planning.control.config.controller_config import mpc_config
 from f1tenth_planning.control.dynamics_model import Dynamics_Model
 from f1tenth_planning.control.discretizers import euler_discretization, system_matrix_discretization
 from scipy.linalg import block_diag
@@ -13,7 +13,7 @@ class LTV_MPC_Solver:
     Formulates and solves a Linear Time-Varying Model Predictive Control (LTV-MPC) problem for a time-varying or nonlinaer system tracking a reference trajectory.
     
     """
-    def __init__(self, config: solver_config, model: Dynamics_Model):
+    def __init__(self, config: mpc_config, model: Dynamics_Model):
         self.config = config
         self.model = model
         self.discretizer = euler_discretization
@@ -197,7 +197,7 @@ class LTV_MPC_Solver:
         else:
             print("Optimization problem failed! Returning the last control input shifted by one timestep.")
             self.uk.value = np.hstack((shifted_u[:, 1:], shifted_u[:, -1].reshape(-1, 1)))
-            last_pred = self.discretizer(self.model.f, pred_x[:, -1], shifted_u[:, -1], self.config.DT)
+            last_pred = self.discretizer(self.model.f, pred_x[:, -1], shifted_u[:, -1], self.config.dt)
             self.xk.value = np.hstack((pred_x[:, 1:], last_pred.reshape(-1, 1)))
             return pred_x, shifted_u
 
@@ -214,7 +214,7 @@ class LTV_MPC_Solver:
         traj_predict = np.zeros((self.config.nx, self.config.N + 1))
         traj_predict[:, 0] = x0
         for i in range(self.config.N):
-            x = self.discretizer(self.model.f, x, u_traj[:, i], self.config.DT)
+            x = self.discretizer(self.model.f, x, u_traj[:, i], self.config.dt)
             traj_predict[:, i + 1] = x
         return traj_predict
     
@@ -232,8 +232,8 @@ class LTV_MPC_Solver:
             Cd (np.ndarray): linearization residual
         """
         A, B = self.model.linearize_around_state(x, u)
-        Ad, Bd = self.dynamics_discretizer(A, B, self.config.DT)
-        Cd = x + self.model.f(x, u) * self.config.DT - Ad @ x - Bd @ u
+        Ad, Bd = self.dynamics_discretizer(A, B, self.config.dt)
+        Cd = x + self.model.f(x, u) * self.config.dt - Ad @ x - Bd @ u
         return Ad, Bd, Cd
     
     def linearize_dynamics_trajectory(self, x_traj, u_traj):

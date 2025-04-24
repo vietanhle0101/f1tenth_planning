@@ -6,8 +6,7 @@ import numpy as np
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.utils.utils import calc_interpolated_reference_trajectory
 from f1tenth_planning.control.controller import Controller
-from f1tenth_planning.control.config.controller_config import dynamic_mpc_config
-from f1tenth_planning.control.config.solver_config import solver_config
+from f1tenth_planning.control.config.controller_config import mpc_config, dynamic_mpc_config
 from f1tenth_planning.control.config.dynamics_config import (
     dynamics_config,
     f1tenth_params,
@@ -34,7 +33,7 @@ class Dynamic_NMPC_Planner(Controller):
         self,
         track: Track,
         params: dynamics_config = f1tenth_params(),
-        config=dynamic_mpc_config(),
+        config: mpc_config = dynamic_mpc_config(),
     ):
         super(Dynamic_NMPC_Planner, self).__init__(
             track,
@@ -80,21 +79,6 @@ class Dynamic_NMPC_Planner(Controller):
         u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
 
         self.model = Dynamic_Bicycle_Model(self.track, self.params)
-        self.solver_config = solver_config(
-            DT=config.dt,
-            N=config.N,
-            nx=self.model.nx,
-            nu=self.model.nu,
-            Q=config.Q,
-            R=config.R,
-            Rd=config.Rd,
-            P=config.P,
-            x_min=x_min,
-            x_max=x_max,
-            u_min=u_min,
-            u_max=u_max,
-        )
-
         ipopt_opts = {
             "ipopt": {
                 "print_level": 0,
@@ -105,7 +89,7 @@ class Dynamic_NMPC_Planner(Controller):
             },
             "print_time": 0,
         }
-        self.solver = Nonlinear_MPC_Solver(self.solver_config, self.model, ipopt_opts)
+        self.solver = Nonlinear_MPC_Solver(self.config, self.model, ipopt_opts)
 
         self.x_pred = None
         self.ref_traj = None

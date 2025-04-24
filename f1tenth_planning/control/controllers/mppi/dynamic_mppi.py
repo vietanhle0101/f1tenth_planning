@@ -5,8 +5,7 @@ import numpy as np
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.utils.utils import calc_interpolated_reference_trajectory
 from f1tenth_planning.control.controller import Controller
-from f1tenth_planning.control.config.controller_config import dynamic_mppi_config
-from f1tenth_planning.control.config.solver_config import solver_config
+from f1tenth_planning.control.config.controller_config import dynamic_mppi_config, mpc_config
 from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1tenth_params
 from f1tenth_planning.control.dynamics_models.dynamic_model import Dynamic_Bicycle_Model
 from f1tenth_planning.control.controllers.mppi.mppi import MPPI
@@ -26,7 +25,7 @@ class Dynamic_NMPC_Planner(Controller):
         self,
         track: Track,
         params: dynamics_config = f1tenth_params(), 
-        config=dynamic_mppi_config(),
+        config: mpc_config =dynamic_mppi_config(),
     ):
         super(Dynamic_NMPC_Planner, self).__init__(track, params,
                                                         control_mode=(SteerActionEnum.Steering_Speed, LongitudinalActionEnum.Accl))
@@ -47,32 +46,7 @@ class Dynamic_NMPC_Planner(Controller):
         u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
 
         self.model = Dynamic_Bicycle_Model(self.track, self.params)
-        self.solver_config = solver_config(
-            DT=config.dt,
-            N=config.N,
-            nx=self.model.nx,
-            nu=self.model.nu,
-            Q=config.Q,
-            R=config.R,
-            Rd=config.Rd,
-            P=config.P,
-            x_min=x_min,
-            x_max=x_max,
-            u_min=u_min,
-            u_max=u_max,
-        )
-
-        ipopt_opts = {
-            'ipopt': {
-                'print_level': 0,
-                'max_iter': 200,
-                'acceptable_tol': 1e-2,
-                'acceptable_obj_change_tol': 1e-3,
-                'warm_start_init_point': 'yes',
-            },
-            'print_time': 0,
-        }
-        self.solver = MPPI(self.solver_config, self.model, ipopt_opts)
+        self.solver = MPPI(self.config, self.model)
 
         self.x_pred = None
         self.ref_traj = None
