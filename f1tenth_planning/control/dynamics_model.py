@@ -1,6 +1,8 @@
 from __future__ import annotations
 from abc import abstractmethod, ABC
 
+import jax
+from jax import numpy as jnp
 import numpy as np
 import casadi as ca
 from f1tenth_gym.envs.track import Track
@@ -72,6 +74,26 @@ class Dynamics_Model(ABC):
         """
         raise NotImplementedError("control method not implemented")
 
+    @abstractmethod
+    def f_jax(self, state: jnp.ndarray, control: jnp.ndarray, params: dynamics_config = None) -> jnp.ndarray:
+        """
+        (Non-)linear dynamics model in JAX. This function computes the state derivative given the current state and control input. Should be 
+        paired with a numerical integrator to propagate the state forward in time (e.g. Runge-Kutta, Euler). All noise in state and control
+        should be handled externally.
+        
+        Mathematically:
+            \dot{x} = f(x, u)
+
+        Args:
+            state (jnp.ndarray): observation as returned from the environment.
+            control (jnp.ndarray): control input as (steering_angle, speed)
+            params (dynamics_config): vehicle dynamics parameters
+
+        Returns:
+            jnp.ndarray: state derivative
+        """
+        raise NotImplementedError("control method not implemented")
+    
     @abstractmethod
     def linearize_around_state(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
         """
