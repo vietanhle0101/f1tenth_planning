@@ -1,3 +1,4 @@
+from functools import partial
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.dynamics_model import Dynamics_Model
 from f1tenth_planning.control.config.dynamics_config import dynamics_config
@@ -158,7 +159,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         return f
     
     @partial(jax.jit, static_argnums=(0))
-    def f_jax(self, state: jnp.ndarray, control: jnp.ndarray, params: dynamics_config) -> jnp.ndarray:
+    def f_jax(self, state: jnp.ndarray, control: jnp.ndarray, params: jnp.ndarray) -> jnp.ndarray:
         """
         Single Track Dynamic Vehicle Dynamics.
 
@@ -178,15 +179,24 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
             Returns:
                 f (numpy.ndarray): right hand side of differential equations
         """
-        if params is not None:
-            self.params = params
-
+        # Extract params for more readable equations
+        mu = params[0, 0]
+        m = params[1, 0]
+        I = params[2, 0]
+        lr = params[3, 0]
+        lf = params[4, 0]
+        C_Sf = params[5, 0]
+        C_Sr = params[6, 0]
+        h = params[7, 0]
+        g = params[8, 0]
+        wheelbase = params[9, 0]
+        
         x, y, delta, v, yaw, yaw_rate, slip_angle = state
         delta_v, a = control
 
         # Compute the state derivative
-        dx = v * np.cos(yaw + slip_angle)
-        dy = v * np.sin(yaw + slip_angle)
+        dx = v * jnp.cos(yaw + slip_angle)
+        dy = v * jnp.sin(yaw + slip_angle)
         ddelta = delta_v
         dv = a
 
@@ -195,36 +205,25 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         dslip_angle = 0
         
         # derivative of yaw "kinemaitcally"
-        dyaw_ks = v * np.cos(slip_angle) / self.params.WHEELBASE * np.tan(delta)
+        dyaw_ks = v * jnp.cos(slip_angle) / wheelbase * jnp.tan(delta)
 
         # derivative of slip angle and yaw rate
-        dslip_angle_ks = (self.params.LR * delta_v) / (
-            self.params.WHEELBASE
-            * np.cos(delta) ** 2
-            * (1 + (np.tan(delta) * self.params.LR / self.params.WHEELBASE) ** 2)
+        dslip_angle_ks = (lr * delta_v) / (
+            wheelbase
+            * jnp.cos(delta) ** 2
+            * (1 + (jnp.tan(delta) * lr / wheelbase) ** 2)
         )
         ddyaw_ks = (
             1
-            / self.params.WHEELBASE
+            / wheelbase
             * (
-                a * np.cos(slip_angle) * np.tan(delta)
-                - v * np.sin(slip_angle) * np.tan(delta) * dslip_angle_ks
-                + v * np.cos(slip_angle) * delta_v / np.cos(delta) ** 2
+                a * jnp.cos(slip_angle) * jnp.tan(delta)
+                - v * jnp.sin(slip_angle) * jnp.tan(delta) * dslip_angle_ks
+                + v * jnp.cos(slip_angle) * delta_v / jnp.cos(delta) ** 2
             )
         )
         
         dyaw_st = yaw_rate
-
-        # Extract params for more readable equations
-        mu = self.params.MU
-        m = self.params.M
-        I = self.params.I
-        lr = self.params.LR
-        lf = self.params.LF
-        C_Sf = self.params.C_SF
-        C_Sr = self.params.C_SR
-        h = self.params.H
-        g = 9.81
 
         ddyaw_st = (
             -mu
@@ -256,7 +255,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         )
 
         return jax.lax.select(
-            jnp.abs(v) <= 0.1,
+            jnp.abs(v) <= 0.5,
             jnp.array([dx, dy, ddelta, dv, dyaw_ks, ddyaw_ks, dslip_angle_ks]),
             jnp.array([dx, dy, ddelta, dv, dyaw_st, ddyaw_st, dslip_angle_st]),
         )
@@ -356,6 +355,29 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
                 9.81,
             ]
         ).reshape(-1, 1)
+    
+    def config_from_parameters_vector(self, params):
+        """
+        Convert a vector of parameters into a dynamics configuration object. This function is useful for optimization problems where the
+        parameters need to be passed as a vector.
+
+        Args:
+            params (np.ndarray): (num_params, 1) vector of parameters
+
+        Returns:
+            dynamics_config: vehicle dynamics parameters
+        """
+        return dynamics_config(
+            MU=params[0],
+            M=params[1],
+            I=params[2],
+            LR=params[3],
+            LF=params[4],
+            C_SF=params[5],
+            C_SR=params[6],
+            H=params[7],
+            g=9.81,
+        )
 
     @property
     def num_params(self) -> int:

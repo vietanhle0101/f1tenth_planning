@@ -75,7 +75,7 @@ class Dynamics_Model(ABC):
         raise NotImplementedError("control method not implemented")
 
     @abstractmethod
-    def f_jax(self, state: jnp.ndarray, control: jnp.ndarray, params: dynamics_config = None) -> jnp.ndarray:
+    def f_jax(self, state: jnp.ndarray, control: jnp.ndarray, params: jnp.ndarray = None) -> jnp.ndarray:
         """
         (Non-)linear dynamics model in JAX. This function computes the state derivative given the current state and control input. Should be 
         paired with a numerical integrator to propagate the state forward in time (e.g. Runge-Kutta, Euler). All noise in state and control
@@ -128,6 +128,20 @@ class Dynamics_Model(ABC):
         """
         raise NotImplementedError("parameters_vector_from_config method not implemented")
     
+    @abstractmethod
+    def config_from_parameters_vector(self, params: np.ndarray) -> dynamics_config:
+        """
+        Convert a vector of parameters into a dynamics configuration object. This function is useful for optimization problems where the
+        parameters need to be passed as a vector.
+
+        Args:
+            params (np.ndarray): (num_params, 1) vector of parameters
+
+        Returns:
+            dynamics_config: vehicle dynamics parameters
+        """
+        raise NotImplementedError("config_from_parameters_vector method not implemented")
+
     @property
     def num_params(self) -> dynamics_config:
         """

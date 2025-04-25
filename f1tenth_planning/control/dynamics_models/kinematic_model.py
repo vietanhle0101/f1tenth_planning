@@ -2,6 +2,7 @@ from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.dynamics_model import Dynamics_Model
 from f1tenth_planning.control.config.dynamics_config import dynamics_config
 
+import jax.numpy as jnp
 import numpy as np
 import casadi as ca
 
@@ -105,9 +106,50 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
         )  # dx/dt = f(x,u)
 
         return RHS
+    
+    def f_jax(
+        self, state: jnp.ndarray, control: jnp.ndarray, params: jnp.ndarray = None
+    ) -> np.ndarray:
+        """
+        Compute the state derivative given the current state and control input using JAX.
+
+        Args:
+            state (np.ndarray): dynamic state as [x, y, delta, v, yaw]
+            control (np.ndarray): control input as (steering_velocity, acceleration)
+            params (dynamics_config): vehicle dynamics parameters
+
+        Returns:
+            np.ndarray: state derivative
+        """
+        # Extract params for more readable equations
+        wheelbase = params[0]
+
+        x, y, delta, v, yaw = state
+        delta_v, a = control
+
+        # Compute the state derivative
+        dx = v * jnp.cos(yaw)
+        dy = v * jnp.sin(yaw)
+        ddelta = delta_v
+        dv = a
+        dyaw = (v / wheelbase) * jnp.tan(delta)
+
+        return jnp.array([dx, dy, ddelta, dv, dyaw])
 
     def parameters_vector_from_config(self, params):
         return np.array([params.WHEELBASE]).reshape(-1, 1)
+    
+    def config_from_parameters_vector(self, p):
+        """
+        Convert a parameter vector to a dynamics_config object.
+
+        Args:
+            p (np.ndarray): parameter vector
+
+        Returns:
+            dynamics_config: vehicle dynamics configuration
+        """
+        return dynamics_config(WHEELBASE=p[0])
 
     @property
     def num_params(self) -> int:
