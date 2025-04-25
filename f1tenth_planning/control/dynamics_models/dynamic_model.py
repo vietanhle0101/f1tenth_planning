@@ -367,17 +367,16 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         Returns:
             dynamics_config: vehicle dynamics parameters
         """
-        return dynamics_config(
-            MU=params[0],
-            M=params[1],
-            I=params[2],
-            LR=params[3],
-            LF=params[4],
-            C_SF=params[5],
-            C_SR=params[6],
-            H=params[7],
-            g=9.81,
-        )
+        current_params = self.params
+        current_params.MU = params[0,0]
+        current_params.M = params[1,0]
+        current_params.I = params[2,0]
+        current_params.LR = params[3,0]
+        current_params.LF = params[4,0]
+        current_params.C_SF = params[5,0]
+        current_params.C_SR = params[6,0]
+        current_params.H = params[7,0]
+        return current_params
 
     @property
     def num_params(self) -> int:
