@@ -10,10 +10,11 @@ from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1t
 from f1tenth_planning.control.dynamics_models.dynamic_model import Dynamic_Bicycle_Model
 from f1tenth_planning.control.controllers.mppi.mppi import MPPI
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
+from f1tenth_planning.utils.utils import jnp_to_np
 
-class Dynamic_NMPC_Planner(Controller):
+class Dynamic_MPPI_Planner(Controller):
     """
-    NMPC Controller, uses CasADi to solve the nonlinear MPC problem using whatever model is passed in.
+    MPPI Controller, uses CasADi to solve the nonlinear MPC problem using whatever model is passed in.
 
     All vehicle pose used by the planner should be in the map frame.
 
@@ -25,9 +26,9 @@ class Dynamic_NMPC_Planner(Controller):
         self,
         track: Track,
         params: dynamics_config = f1tenth_params(), 
-        config: mpc_config =dynamic_mppi_config(),
+        config: mpc_config = dynamic_mppi_config(),
     ):
-        super(Dynamic_NMPC_Planner, self).__init__(track, params,
+        super(Dynamic_MPPI_Planner, self).__init__(track, params,
                                                         control_mode=(SteerActionEnum.Steering_Speed, LongitudinalActionEnum.Accl))
         self.config = config
         self.waypoints = np.vstack([
@@ -40,10 +41,10 @@ class Dynamic_NMPC_Planner(Controller):
             np.zeros_like(track.raceline.xs),  # slip angle
         ]).T
         
-        x_min = np.array([-np.inf, -np.inf, self.params.MIN_STEER, self.params.MIN_SPEED, -np.inf, -np.inf, -np.inf])
-        x_max = np.array([+np.inf, +np.inf, self.params.MAX_STEER, self.params.MAX_SPEED, +np.inf, +np.inf, +np.inf])
         u_min = np.array([self.params.MIN_DSTEER, self.params.MIN_ACCEL])
         u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
+        self.config.u_min = u_min
+        self.config.u_max = u_max
 
         self.model = Dynamic_Bicycle_Model(self.track, self.params)
         self.solver = MPPI(self.config, self.model)
@@ -65,7 +66,6 @@ class Dynamic_NMPC_Planner(Controller):
             e: The environment renderer instance used for drawing.
         """
         if self.x_pred is not None:
-            self.control_solution = np.array(self.x_pred[:2, :]).T
             if self.mpc_solution_render is None:
                 self.mpc_solution_render = e.render_points(
                     self.control_solution, color=(128, 0, 0), size=4
@@ -81,7 +81,6 @@ class Dynamic_NMPC_Planner(Controller):
             e: The environment renderer instance used for drawing.
         """
         if self.ref_traj is not None:
-            self.local_plan = self.ref_traj[:2].T
             if self.local_plan_render is None:
                 self.local_plan_render = e.render_closed_lines(
                     self.local_plan, color=(0, 0, 128), size=4
@@ -131,7 +130,8 @@ class Dynamic_NMPC_Planner(Controller):
         
         cx = self.waypoints[:, 0]
         cy = self.waypoints[:, 1]
-        v_max_prev = np.max(self.x_pred[3, :]) if self.x_pred is not None else v
+        # v_max_prev = np.max(self.x_pred[3, :]) if self.x_pred is not None else v
+        v_max_prev = np.max(self.waypoints[:, 3]) if self.waypoints is not None else v
         self.ref_traj = calc_interpolated_reference_trajectory(x, y, cx, cy, v_max_prev, self.config.dt, self.config.N, self.waypoints).T.copy()
 
         self.ref_traj[4][self.ref_traj[4] - yaw > 4.5] = np.abs(
@@ -146,9 +146,11 @@ class Dynamic_NMPC_Planner(Controller):
             opti_params = self.model.parameters_vector_from_config(params)
             self.params = params
         
-        self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj, p=opti_params)
+        self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj.T, p=opti_params)
+        self.x_pred = jnp_to_np(self.x_pred)
+        self.u_pred = jnp_to_np(self.u_pred)
 
         self.local_plan = self.ref_traj[:2].T
-        self.control_solution = np.array(self.x_pred[:2, :]).T
+        self.control_solution = np.array(self.x_pred[:, :2])
         
-        return np.array(self.u_pred[:, 0]).flatten()
+        return np.array(self.u_pred[0]).flatten()

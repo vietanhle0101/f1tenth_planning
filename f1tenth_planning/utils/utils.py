@@ -27,6 +27,7 @@ Author: Hongrui Zheng
 Last Modified: 5/27/21
 """
 
+import jax
 import numpy as np
 import math
 from numba import njit
@@ -422,3 +423,9 @@ def input_steering_speed_to_angle(delta_0, delta_v, dt):
     Returns the steering angle after applying steering velocity for a given time
     """
     return delta_0 + delta_v * dt
+
+def jnp_to_np(jnp_array):
+    """
+    Converts a jax numpy array to a numpy array
+    """
+    return np.array(jax.device_get(jnp_array))
