@@ -7,13 +7,17 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 # Change your controller
-from f1tenth_planning.control import (
-    Nonlinear_Dynamic_MPC_Planner as RoboracerController,
-)
+# from f1tenth_planning.control import (
+#     Nonlinear_Dynamic_MPC_Planner as RoboracerController,
+# )
 
 # from f1tenth_planning.control import (
 #     Nonlinear_Kinemtic_MPC_Planner as RoboracerController,
 # )
+from f1tenth_planning.control import (
+    Nonlinear_Dynamic_MPPI_Planner as RoboracerController,
+)
+
 from f1tenth_planning.utils.utils import (
     input_steering_speed_to_angle,
     input_acceleration_to_speed,

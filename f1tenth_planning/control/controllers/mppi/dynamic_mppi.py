@@ -153,4 +153,9 @@ class Dynamic_MPPI_Planner(Controller):
         self.local_plan = self.ref_traj[:2].T
         self.control_solution = np.array(self.x_pred[:, :2])
         
-        return np.array(self.u_pred[0]).flatten()
+        return np.array(self.u_pred[0]).flatten() , {
+            "predicted_state": self.x_pred,
+            "predicted_control": self.u_pred,
+            "steering_angle": self.x_pred[1, 2],
+            "velocity": self.x_pred[1, 3],
+        }
