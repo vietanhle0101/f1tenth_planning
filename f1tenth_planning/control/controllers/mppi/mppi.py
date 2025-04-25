@@ -228,5 +228,6 @@ class MPPI:
     # Get the solved for control and state trajectory
     self.uk = self.control_params[0] # [N, nu]
     self.xk, _ = self._rollout(self.uk, x0, jax_ref) # [N, nu]
+    self.xk = jnp.concatenate([jnp.expand_dims(x0, axis=0), self.xk], axis=0)
 
     return self.xk, self.uk
