@@ -214,7 +214,7 @@ class LTV_MPC_Solver:
         traj_predict = np.zeros((self.config.nx, self.config.N + 1))
         traj_predict[:, 0] = x0
         for i in range(self.config.N):
-            x = self.discretizer(self.model.f, x, u_traj[:, i], self.config.dt)
+            x = self.discretizer(self.model.f, x, u_traj[:, i], self.model.params, self.config.dt)
             traj_predict[:, i + 1] = x
         return traj_predict
     

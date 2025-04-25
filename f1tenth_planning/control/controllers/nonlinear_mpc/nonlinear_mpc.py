@@ -65,7 +65,7 @@ class Nonlinear_MPC_Solver:
             
             # state dynamics constraint
             st_next = X[:, k+1]
-            st_next_RK4 = self.discretizer(f, st, con, params, self.config.DT)
+            st_next_RK4 = self.discretizer(f, st, con, params, self.config.dt)
             g = ca.vertcat(g, st_next - st_next_RK4)
 
         # terminal cost
