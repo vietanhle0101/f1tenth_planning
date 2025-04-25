@@ -100,6 +100,21 @@ class mppi_config:
     scan: bool = field(default=True)
     adaptive_covariance: bool = field(default=False)
 
+    def __post_init__(self):
+        # Default u_min, u_max to infinities if not provided
+        if self.u_min is None:
+            self.u_min = -np.inf * np.ones(self.nu)
+        if self.u_max is None:
+            self.u_max = np.inf * np.ones(self.nu)
+
+        # Check that the dimensions of nx and nu are consistent with Q, Qf, R
+        assert self.Q.shape == (self.nx, self.nx), "Q matrix has incorrect dimensions"
+        assert self.R.shape == (self.nu, self.nu), "R matrix has incorrect dimensions"
+        assert self.P.shape == (self.nx, self.nx), "P matrix has incorrect dimensions"
+        assert self.Rd.shape == (self.nu, self.nu), "Rd matrix has incorrect dimensions"
+        assert self.u_min.shape == (self.nu,), "u_min has incorrect dimensions"
+        assert self.u_max.shape == (self.nu,), "u_max has incorrect dimensions"
+
 
 def kinematic_mpc_config():
     # [x, y, delta, v, yaw]
@@ -134,10 +149,10 @@ def dynamic_mppi_config():
         nx=7,
         nu=2,
         N=10,
-        Q=np.diag([25.0, 25.0, 0.0, 7.0, 1000.0, 0.0, 100.0]),
+        Q=np.diag([25.0, 25.0, 0.0, 25.0, 0.0, 0.0, 0.0]),
         R=np.diag([0.01, 0.4]),
         Rd=np.diag([0.002, 0.01]),
-        P=np.diag([25.0, 25.0, 0.0, 7.0, 1000.0, 0.0, 100.0]),
+        P=np.diag([25.0, 25.0, 0.0, 7.0, 0.0, 0.0, 0.0]),
         dt=0.1,
         n_iterations=1,
         n_samples=1024,
