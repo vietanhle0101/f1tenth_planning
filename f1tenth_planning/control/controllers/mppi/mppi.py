@@ -4,7 +4,37 @@ from functools import partial
 from f1tenth_planning.control.dynamics_model import Dynamics_Model
 from f1tenth_planning.control.config.controller_config import mppi_config
 from f1tenth_planning.control.discretizers import rk4_discretization
-import numpy as np
+
+def truncated_gaussian_sampler(key, mean, low, high, cov):
+    """
+    Multivariate truncated Gaussian sampler using Cholesky decomposition.
+    Generates samples from a truncated Gaussian distribution with given mean, covariance, and bounds.
+
+    Parameters:
+      key (jax.random.PRNGKey): Random key for sampling
+      mean (numpy.ndarray): Mean of the distribution
+      low (numpy.ndarray): Lower bounds for each dimension
+      high (numpy.ndarray): Upper bounds for each dimension
+      cov (numpy.ndarray): Covariance matrix (optional)
+    Returns:
+      numpy.ndarray: One sample from the truncated Gaussian distribution
+
+    """
+    R = jnp.linalg.cholesky(cov)
+
+    # Adjust the bounds for the truncated normal distribution
+    adjusted_low = (low - mean) / jnp.diag(R)
+    adjusted_high = (high - mean) / jnp.diag(R)
+
+    # Generate truncated standard normal samples
+    samples = jax.random.truncated_normal(
+        key,
+        lower=adjusted_low,
+        upper=adjusted_high,
+    )
+    
+    # Transform back to original space
+    return mean + R @ samples
 
 class MPPI:
   """
@@ -21,6 +51,7 @@ class MPPI:
     self.model = model
     self.discretizer = rk4_discretization
     self.control_params = self._init_control()  # [N, nu]
+    self.p = self.model.parameters_vector_from_config(self.model.params)
 
   def _init_control(self):
     """
@@ -45,35 +76,19 @@ class MPPI:
   def iteration_step(self, input_, env_state, ref_traj):
     a_opt, a_cov, rng = input_
     rng_da, rng = jax.random.split(rng)
-    if self.config.adaptive_covariance:
-      # Truncated normal to ensure control inputs are within bounds
-      sqrt_cov = jnp.linalg.cholesky(a_cov)
-      # Must ensure that a + da is within bounds
-      lower = self.config.u_min - a_opt
-      upper = self.config.u_max - a_opt
-      da = sqrt_cov @ jax.random.truncated_normal(
-          rng_da,
-          lower=lower,
-          upper=upper,
-          shape=(self.config.n_samples, self.config.N, self.nu)
-      ) # [n_samples, N, nu]
-    else:
-      # Truncated normal to ensure control inputs are within bounds
-      sqrt_cov = jnp.linalg.cholesky(a_cov)
-      # Must ensure that a + da is within bounds
-      lower = self.config.u_min - a_opt
-      upper = self.config.u_max - a_opt
-      da = sqrt_cov @ jax.random.truncated_normal(
-          rng_da,
-          lower=lower,
-          upper=upper,
-          shape=(self.config.n_samples, self.config.N, self.nu)
-      ) # [n_samples, N, nu]
-
-
-    # a: [n_samples, N, nu]
-    a = jnp.expand_dims(a_opt, axis=0) + da  # [n_samples, N, nu]
-    s, r = jax.vmap(self._rollout, in_axes=(0, None, 0))(
+    adjusted_lower = (self.config.u_min - a_opt)
+    adjusted_upper = (self.config.u_max - a_opt)
+    # TODO: Find a way to use the covariance matrix
+    da = jax.random.truncated_normal(
+        rng_da,
+        lower=adjusted_lower,
+        upper=adjusted_upper,
+        shape=(self.config.n_samples, self.config.N, self.config.nu),
+    )
+    a = a_opt + da  # [n_samples, N, nu]
+    a = jnp.clip(a, -self.config.u_max, self.config.u_max)  # [n_samples, N, nu]
+    
+    s, r = jax.vmap(self._rollout, in_axes=(0, None, None))(
         a, env_state, ref_traj
     )  # [n_samples, N]
     R = jax.vmap(self._returns)(r)  # [n_samples, N], pylint: disable=invalid-name
@@ -88,14 +103,14 @@ class MPPI:
           a_cov, 0, w
       )  # a_cov: [N, nu, nu]
       # prevent loss of rank when one sample is heavily weighted
-      a_cov = a_cov + jnp.eye(self.nu)*0.00001
+      a_cov = a_cov + jnp.eye(self.config.nu)*0.00001
     return (a_opt, a_cov, rng), (a, s, r)
   
   def _step(self, x, u):
     """
     Single-step state prediction function.
     """
-    return self.discretizer(self.model.f_jax, x, u, self.model.params)
+    return self.discretizer(self.model.f_jax, x, u, self.p, self.config.dt)
   
   def _reward(self, x, u, x_ref):
     """
@@ -116,22 +131,19 @@ class MPPI:
     Returns:
         tuple: updated MPPI state and sampled trajectories
     """
-    nu = jnp.prod(self.config.nu)  # np.int32
-    self.nu = jnp.prod(jnp.array(self.config.nu))
-
     a_opt, a_cov = control_params
     a_opt = jnp.concatenate([a_opt[1:, :],
-                             jnp.expand_dims(jnp.zeros((nu,)),
+                             jnp.expand_dims(jnp.zeros((self.config.nu,)),
                                              axis=0)])  # [N, nu]
     if self.config.adaptive_covariance:
       a_cov = jnp.concatenate([a_cov[1:, :],
-                               jnp.expand_dims((self.config.u_std**2)*jnp.eye(nu),
+                               jnp.expand_dims((self.config.u_std**2)*jnp.eye(self.config.nu),
                                                axis=0)])
-    if not self.config.scan:
+    if not self.config.scan or self.config.n_iterations == 1:
       for _ in range(self.config.n_iterations):
         (a_opt, a_cov, rng), (a_sampled, s_sampled, r_sampled) = self.iteration_step((a_opt, a_cov, rng), x0, ref_traj)
     else:
-      (a_opt, a_cov, rng), _ = jax.lax.scan(
+      (a_opt, a_cov, rng), (a_sampled, s_sampled, r_sampled) = jax.lax.scan(
           lambda input_, _: self.iteration_step(input_, x0, ref_traj), 
           (a_opt, a_cov, rng), None, length=self.config.n_iterations
       )
@@ -167,26 +179,33 @@ class MPPI:
         np.ndarray: reward trajectory of shape (N+1,)
     """
 
-    def rollout_step(x, u, xref):
-      u = jnp.reshape(u, jnp.array(self.config.nu))
-      x = self._step(x, u)
-      r = self._reward(x, u, xref)
+    def rollout_step(x, u):
+      state, ind = x
+      u = jnp.reshape(u, (self.config.nu, ))
+      state = self._step(state, u)
+      r = self._reward(state, u, xref[ind + 1, :])
+      x = (state, ind + 1)
       return x, (x, r)
     if not self.config.scan:
       # python equivalent of lax.scan
       scan_output = []
       for t in range(self.config.N):
-        x0, output = rollout_step(x0, u[t, :], xref[t, :])
+        x0, output = rollout_step((x0,t), u[t, :])
+        x0 = x0[0]
         scan_output.append(output)
       s, r = jax.tree_util.tree_map(lambda *x: jnp.stack(x), *scan_output)
+      s = s[0]
     else:
-      _, (s, r) = jax.lax.scan(rollout_step, x0, u, xref)
+      state_and_index_init = (x0, 0)
+      _, (state_and_index, r) = jax.lax.scan(rollout_step, state_and_index_init, u)
+      s = state_and_index[0]
 
     return (s, r)
   
-  def solve(self, x0, ref_traj)->tuple[jnp.ndarray, jnp.ndarray]:  
+  def solve(self, x0, ref_traj, p=None)->tuple[jnp.ndarray, jnp.ndarray]:  
     """
     Solve the MPPI problem for the given initial state and reference trajectory.
+    WARNING: Returned arrays are on the GPU, use jax.device_get() to get them on the CPU.
 
     Args:
         x0 (np.ndarray): initial state of shape (nx,)
@@ -196,11 +215,18 @@ class MPPI:
         np.ndarray: optimal control input of shape (nu, N)
         np.ndarray: optimal state trajectory of shape (nx, N+1)
     """
+    if p is not None:
+      # TODO: Clean this up so that we don't have to vectorize then unvectorize
+      self.model.params = self.model.config_from_parameters_vector(p)
+      self.p = p
+
     rng = jax.random.PRNGKey(0)
-    self.control_params, self.samples = self.update(x0, ref_traj, self.control_params, rng)
+    jax_x0 = jnp.array(x0)
+    jax_ref = jnp.array(ref_traj)
+    self.control_params, self.samples = self.update(jax_x0, jax_ref, self.control_params, rng)
   
     # Get the solved for control and state trajectory
     self.uk = self.control_params[0] # [N, nu]
-    self.xk = self._rollout(self.uk, x0) # [N, nu]
+    self.xk, _ = self._rollout(self.uk, x0, jax_ref) # [N, nu]
 
     return self.xk, self.uk
