@@ -230,4 +230,8 @@ class MPPI:
     self.xk, _ = self._rollout(self.uk, x0, jax_ref) # [N, nu]
     self.xk = jnp.concatenate([jnp.expand_dims(x0, axis=0), self.xk], axis=0)
 
+    # Make sure xk and uk are in the right shape
+    self.xk = jnp.transpose(self.xk)  # [nx, N+1]
+    self.uk = jnp.transpose(self.uk)  # [nu, N]
+
     return self.xk, self.uk

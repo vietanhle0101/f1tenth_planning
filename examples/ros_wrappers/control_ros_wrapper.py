@@ -69,7 +69,7 @@ class ControlRosWrapper(Node):
         )
 
         # Multiply the velocity by a factor
-        waypoints_track.raceline.vxs *= 1.5
+        waypoints_track.raceline.vxs *= 1.0
 
         # Create planner
         self.planner = RoboracerController(
@@ -218,8 +218,8 @@ class ControlRosWrapper(Node):
 
         # Plan control commands
         action, info = self.planner.plan(state_dict, params=self.params)
-        steer_action = action[0]
-        longitudtinal_action = action[1]
+        steer_action = float(action[0])
+        longitudtinal_action = float(action[1])
 
         self.publish_visualizations(
             np.array(self.planner.ref_traj[:2].T),

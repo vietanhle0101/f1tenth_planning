@@ -41,8 +41,8 @@ class Dynamic_MPPI_Planner(Controller):
             np.zeros_like(track.raceline.xs),  # slip angle
         ]).T
         
-        u_min = np.array([self.params.MIN_DSTEER, self.params.MIN_ACCEL])
-        u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
+        u_min = np.array([2 * self.params.MIN_DSTEER, self.params.MIN_ACCEL])
+        u_max = np.array([2 * self.params.MAX_DSTEER, self.params.MAX_ACCEL])
         self.config.u_min = u_min
         self.config.u_max = u_max
 
@@ -156,6 +156,6 @@ class Dynamic_MPPI_Planner(Controller):
         return np.array(self.u_pred[0]).flatten() , {
             "predicted_state": self.x_pred,
             "predicted_control": self.u_pred,
-            "steering_angle": self.x_pred[1, 2],
-            "velocity": self.x_pred[1, 3],
+            "steering_angle": self.x_pred[2, 1],
+            "velocity": self.x_pred[3, 1],
         }
