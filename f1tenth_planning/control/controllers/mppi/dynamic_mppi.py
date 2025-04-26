@@ -1,16 +1,24 @@
 """
-NMPC waypoint tracker using CasADi. On init, takes in model equation. 
+NMPC waypoint tracker using CasADi. On init, takes in model equation.
 """
+
 import numpy as np
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.utils.utils import calc_interpolated_reference_trajectory
 from f1tenth_planning.control.controller import Controller
-from f1tenth_planning.control.config.controller_config import dynamic_mppi_config, mpc_config
-from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1tenth_params
+from f1tenth_planning.control.config.controller_config import (
+    dynamic_mppi_config,
+    mpc_config,
+)
+from f1tenth_planning.control.config.dynamics_config import (
+    dynamics_config,
+    f1tenth_params,
+)
 from f1tenth_planning.control.dynamics_models.dynamic_model import Dynamic_Bicycle_Model
 from f1tenth_planning.control.controllers.mppi.mppi import MPPI
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 from f1tenth_planning.utils.utils import jnp_to_np
+
 
 class Dynamic_MPPI_Planner(Controller):
     """
@@ -22,27 +30,33 @@ class Dynamic_MPPI_Planner(Controller):
         track (f1tenth_gym_ros:Track): track object, contains the reference raceline
         config (mpc_config, optional): MPC configuration object, contains MPC costs and constraints
     """
+
     def __init__(
         self,
         track: Track,
-        params: dynamics_config = f1tenth_params(), 
+        params: dynamics_config = f1tenth_params(),
         config: mpc_config = dynamic_mppi_config(),
     ):
-        super(Dynamic_MPPI_Planner, self).__init__(track, params,
-                                                        control_mode=(SteerActionEnum.Steering_Speed, LongitudinalActionEnum.Accl))
+        super(Dynamic_MPPI_Planner, self).__init__(
+            track,
+            params,
+            control_mode=(SteerActionEnum.Steering_Speed, LongitudinalActionEnum.Accl),
+        )
         self.config = config
-        self.waypoints = np.vstack([
-            track.raceline.xs,                 # x
-            track.raceline.ys,                 # y
-            np.zeros_like(track.raceline.xs),  # steering angle reference
-            track.raceline.vxs,                # v
-            track.raceline.yaws,               # yaw
-            np.zeros_like(track.raceline.xs),  # yaw rate reference
-            np.zeros_like(track.raceline.xs),  # slip angle
-        ]).T
-        
-        u_min = np.array([2 * self.params.MIN_DSTEER, self.params.MIN_ACCEL])
-        u_max = np.array([2 * self.params.MAX_DSTEER, self.params.MAX_ACCEL])
+        self.waypoints = np.vstack(
+            [
+                track.raceline.xs,  # x
+                track.raceline.ys,  # y
+                np.zeros_like(track.raceline.xs),  # steering angle reference
+                track.raceline.vxs,  # v
+                track.raceline.yaws,  # yaw
+                np.zeros_like(track.raceline.xs),  # yaw rate reference
+                np.zeros_like(track.raceline.xs),  # slip angle
+            ]
+        ).T
+
+        u_min = np.array([self.params.MIN_DSTEER, self.params.MIN_ACCEL])
+        u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
         self.config.u_min = u_min
         self.config.u_max = u_max
 
@@ -54,7 +68,7 @@ class Dynamic_MPPI_Planner(Controller):
 
         self.control_solution = None
         self.local_plan = None
-        
+
         self.mpc_solution_render = None
         self.local_plan_render = None
 
@@ -87,8 +101,8 @@ class Dynamic_MPPI_Planner(Controller):
                 )
             else:
                 self.local_plan_render.setData(self.local_plan)
-    
-    def plan(self, state:dict, waypoints=None, params: dynamics_config = None):
+
+    def plan(self, state: dict, waypoints=None, params: dynamics_config = None):
         """
         Compute the control input for the vehicle using a Kinematic MPC planner.
 
@@ -107,53 +121,50 @@ class Dynamic_MPPI_Planner(Controller):
         """
         if waypoints is not None:
             if waypoints.shape[1] < 3 or len(waypoints.shape) != 2:
-                raise ValueError("Waypoints need to be a (N x m) numpy array with m >= 3!")
+                raise ValueError(
+                    "Waypoints need to be a (N x m) numpy array with m >= 3!"
+                )
             self.waypoints = waypoints
         else:
             if self.waypoints is None:
                 raise ValueError(
                     "Please set waypoints to track during planner instantiation or when calling plan()"
                 )
-        
+
         x = state["pose_x"]
         y = state["pose_y"]
         v = state["linear_vel_x"]
         yaw = state["pose_theta"]
-        x0 = np.array([x, 
-                       y, 
-                       state["delta"], 
-                       v, 
-                       yaw,
-                       state["ang_vel_z"],
-                       state["beta"]
-                       ])
-        
+        x0 = np.array([x, y, state["delta"], v, yaw, state["ang_vel_z"], state["beta"]])
+
         cx = self.waypoints[:, 0]
         cy = self.waypoints[:, 1]
         # v_max_prev = np.max(self.x_pred[3, :]) if self.x_pred is not None else v
         v_max_prev = np.max(self.waypoints[:, 3]) if self.waypoints is not None else v
-        self.ref_traj = calc_interpolated_reference_trajectory(x, y, cx, cy, v_max_prev, self.config.dt, self.config.N, self.waypoints).T.copy()
+        self.ref_traj = calc_interpolated_reference_trajectory(
+            x, y, cx, cy, v_max_prev, self.config.dt, self.config.N, self.waypoints
+        ).T.copy()
 
-        self.ref_traj[4][self.ref_traj[4] - yaw > 4.5] = np.abs(
-            self.ref_traj[4][self.ref_traj[4] - yaw > 4.5] - (2 * np.pi)
-        )
-        self.ref_traj[4][self.ref_traj[4] - yaw < -4.5] = np.abs(
-            self.ref_traj[4][self.ref_traj[4] - yaw < -4.5] + (2 * np.pi)
-        )
+        # self.ref_traj[4][self.ref_traj[4] - yaw > 4.5] = np.abs(
+        #     self.ref_traj[4][self.ref_traj[4] - yaw > 4.5] - (2 * np.pi)
+        # )
+        # self.ref_traj[4][self.ref_traj[4] - yaw < -4.5] = np.abs(
+        #     self.ref_traj[4][self.ref_traj[4] - yaw < -4.5] + (2 * np.pi)
+        # )
 
         opti_params = None
         if params is not None:
             opti_params = self.model.parameters_vector_from_config(params)
             self.params = params
-        
+
         self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj.T, p=opti_params)
         self.x_pred = jnp_to_np(self.x_pred)
         self.u_pred = jnp_to_np(self.u_pred)
 
         self.local_plan = self.ref_traj[:2].T
-        self.control_solution = np.array(self.x_pred[:, :2])
-        
-        return np.array(self.u_pred[0]).flatten() , {
+        self.control_solution = np.array(self.x_pred[:2, :])
+
+        return np.array(self.u_pred[:, 0]).flatten(), {
             "predicted_state": self.x_pred,
             "predicted_control": self.u_pred,
             "steering_angle": self.x_pred[2, 1],
