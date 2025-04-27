@@ -7,16 +7,16 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 # Change your controller
-# from f1tenth_planning.control import (
-#     Nonlinear_Dynamic_MPC_Planner as RoboracerController,
-# )
-
-# from f1tenth_planning.control import (
-#     Nonlinear_Kinemtic_MPC_Planner as RoboracerController,
-# )
 from f1tenth_planning.control import (
-    Nonlinear_Dynamic_MPPI_Planner as RoboracerController,
+    Nonlinear_Dynamic_MPC_Planner as RoboracerController,
 )
+
+#from f1tenth_planning.control import (
+#    Nonlinear_Kinemtic_MPC_Planner as RoboracerController,
+#)
+#from f1tenth_planning.control import (
+#   Nonlinear_Dynamic_MPPI_Planner as RoboracerController,
+#)
 
 from f1tenth_planning.utils.utils import (
     input_steering_speed_to_angle,
@@ -25,6 +25,7 @@ from f1tenth_planning.utils.utils import (
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.config.dynamics_config import (
     fullscale_params,
+    f1fifth_params,
     update_config_from_dict,
 )
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
@@ -69,13 +70,13 @@ class ControlRosWrapper(Node):
         )
 
         # Multiply the velocity by a factor
-        waypoints_track.raceline.vxs *= 1.25
+        waypoints_track.raceline.vxs *= 0.5
 
         # Create planner
         self.planner = RoboracerController(
-            track=waypoints_track, params=fullscale_params()
+            track=waypoints_track, params=f1fifth_params()
         )
-        self.params = fullscale_params()
+        self.params = f1fifth_params()
 
         # ROS publishers and subscribers
         self.drive_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
