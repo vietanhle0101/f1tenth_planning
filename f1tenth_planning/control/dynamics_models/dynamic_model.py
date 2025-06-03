@@ -9,7 +9,6 @@ import jax
 import jax.numpy as jnp
 
 
-
 class Dynamic_Bicycle_Model(Dynamics_Model):
     """
     Dynamic single-track bicycle model for vehicle dynamics.
@@ -157,9 +156,11 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         # maps controls, states and parameters to the right-hand side of the equation
         f = ca.Function("f", [states, controls, params], [RHS])
         return f
-    
+
     @partial(jax.jit, static_argnums=(0))
-    def f_jax(self, state: jnp.ndarray, control: jnp.ndarray, params: jnp.ndarray) -> jnp.ndarray:
+    def f_jax(
+        self, state: jnp.ndarray, control: jnp.ndarray, params: jnp.ndarray
+    ) -> jnp.ndarray:
         """
         Single Track Dynamic Vehicle Dynamics.
 
@@ -189,8 +190,8 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         C_Sr = params[6, 0]
         h = params[7, 0]
         g = params[8, 0]
-        wheelbase = params[9, 0]
-        
+        wheelbase = lf + lr
+
         x, y, delta, v, yaw, yaw_rate, slip_angle = state
         delta_v, a = control
 
@@ -203,15 +204,15 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         dyaw = 0
         ddyaw = 0
         dslip_angle = 0
-        
+
         # derivative of yaw "kinemaitcally"
-        dyaw_ks = v * jnp.cos(slip_angle) / wheelbase * jnp.tan(delta)
+        dyaw_ks = v * jnp.cos(slip_angle) * jnp.tan(delta) / wheelbase
 
         # derivative of slip angle and yaw rate
         dslip_angle_ks = (lr * delta_v) / (
             wheelbase
             * jnp.cos(delta) ** 2
-            * (1 + (jnp.tan(delta) * lr / wheelbase) ** 2)
+            * (1 + (jnp.tan(delta)**2 * lr / wheelbase) ** 2)
         )
         ddyaw_ks = (
             1
@@ -222,7 +223,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
                 + v * jnp.cos(slip_angle) * delta_v / jnp.cos(delta) ** 2
             )
         )
-        
+
         dyaw_st = yaw_rate
 
         ddyaw_st = (
@@ -255,7 +256,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         )
 
         return jax.lax.select(
-            jnp.abs(v) <= 0.5,
+            jnp.abs(v) <= 1.5,
             jnp.array([dx, dy, ddelta, dv, dyaw_ks, ddyaw_ks, dslip_angle_ks]),
             jnp.array([dx, dy, ddelta, dv, dyaw_st, ddyaw_st, dslip_angle_st]),
         )
@@ -337,7 +338,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
             d_beta_fast,  # dbeta/dt = d_beta
         )  # dx/dt = f(x,u)
 
-        RHS = ca.if_else(v >= 0.5, RHS_HIGH_SPEED, RHS_LOW_SPEED)
+        RHS = ca.if_else(v >= 1.5, RHS_HIGH_SPEED, RHS_LOW_SPEED)
 
         return RHS
 
@@ -355,7 +356,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
                 9.81,
             ]
         ).reshape(-1, 1)
-    
+
     def config_from_parameters_vector(self, params):
         """
         Convert a vector of parameters into a dynamics configuration object. This function is useful for optimization problems where the
@@ -368,14 +369,14 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
             dynamics_config: vehicle dynamics parameters
         """
         current_params = self.params
-        current_params.MU = params[0,0]
-        current_params.M = params[1,0]
-        current_params.I = params[2,0]
-        current_params.LR = params[3,0]
-        current_params.LF = params[4,0]
-        current_params.C_SF = params[5,0]
-        current_params.C_SR = params[6,0]
-        current_params.H = params[7,0]
+        current_params.MU = params[0, 0]
+        current_params.M = params[1, 0]
+        current_params.I = params[2, 0]
+        current_params.LR = params[3, 0]
+        current_params.LF = params[4, 0]
+        current_params.C_SF = params[5, 0]
+        current_params.C_SR = params[6, 0]
+        current_params.H = params[7, 0]
         return current_params
 
     @property

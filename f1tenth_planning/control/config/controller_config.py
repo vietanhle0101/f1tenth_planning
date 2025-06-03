@@ -17,6 +17,7 @@ class mpc_config:
         P (np.ndarray): Terminal cost matrix.
         dt (float): Time discretization interval.
     """
+
     N: int
     dt: float
 
@@ -62,6 +63,7 @@ class mpc_config:
         assert self.ud_min.shape == (self.nu,), "ud_min has incorrect dimensions"
         assert self.ud_max.shape == (self.nu,), "ud_max has incorrect dimensions"
 
+
 @dataclass
 class mppi_config:
     """
@@ -96,7 +98,7 @@ class mppi_config:
     n_samples: int = field(default=16)
     temperature: float = field(default=0.01)
     damping: float = field(default=0.001)
-    u_std: float = field(default=0.1) # std of the control noise
+    u_std: float = field(default=0.5)  # std of the control noise
     scan: bool = field(default=True)
     adaptive_covariance: bool = field(default=False)
 
@@ -135,7 +137,7 @@ def dynamic_mpc_config():
     return mpc_config(
         nx=7,
         nu=2,
-        N=10,
+        N=15,
         Q=np.diag([25.0, 25.0, 0.0, 7.0, 1000.0, 0.0, 100.0]),
         R=np.diag([0.01, 0.4]),
         Rd=np.diag([0.002, 0.01]),
@@ -143,20 +145,22 @@ def dynamic_mpc_config():
         dt=0.1,
     )
 
+
 def dynamic_mppi_config():
     # [x, y, delta, v, yaw, yaw_rate, beta]
     return mppi_config(
         nx=7,
         nu=2,
-        N=10,
-        Q=np.diag([25.0, 25.0, 0.0, 25.0, 0.0, 0.0, 0.0]),
-        R=np.diag([0.01, 0.4]),
-        Rd=np.diag([0.002, 0.01]),
-        P=np.diag([25.0, 25.0, 0.0, 7.0, 0.0, 0.0, 0.0]),
+        N=15,
+        Q=np.diag([25.0, 25.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
+        R=np.diag([0.01, 0.00]),
+        Rd=np.diag([0.01, 0.00]),
+        P=np.diag([25.0, 25.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
         dt=0.1,
         n_iterations=1,
-        n_samples=1024,
+        n_samples=512,
         adaptive_covariance=True,
+        scan=True,
     )
 
 
