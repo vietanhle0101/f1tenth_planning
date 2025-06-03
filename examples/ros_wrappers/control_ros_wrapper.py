@@ -214,6 +214,7 @@ class ControlRosWrapper(Node):
                 "beta": beta,
             }
 
+        # print(f"State: {state_dict}")
         # Plan control commands
         action, info = self.planner.plan(state_dict, params=self.params)
         steer_action = float(action[0])
@@ -238,6 +239,9 @@ class ControlRosWrapper(Node):
         drive_msg.drive.acceleration = longitudtinal_action
         drive_msg.drive.speed = speed
         self.drive_pub.publish(drive_msg)
+        # self.get_logger().info(
+        #     f"Steering angle: {steer:.2f}, Speed: {speed:.2f}, Delta: {self.delta:.2f}"
+        # )
 
     def param_update_callback(self, param_msg: ParamList):
         # Create a dict from param_msg.Params
