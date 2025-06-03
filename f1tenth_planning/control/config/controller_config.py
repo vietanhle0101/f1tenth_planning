@@ -158,7 +158,7 @@ def dynamic_mppi_config():
         P=np.diag([25.0, 25.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
         dt=0.1,
         n_iterations=1,
-        n_samples=1024,
+        n_samples=512,
         adaptive_covariance=True,
         scan=True,
     )

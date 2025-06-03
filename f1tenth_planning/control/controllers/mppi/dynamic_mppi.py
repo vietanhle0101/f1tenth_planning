@@ -82,10 +82,10 @@ class Dynamic_MPPI_Planner(Controller):
         if self.x_pred is not None:
             if self.mpc_solution_render is None:
                 self.mpc_solution_render = e.render_points(
-                    self.control_solution, color=(128, 0, 0), size=4
+                    self.control_solution.T, color=(128, 0, 0), size=4
                 )
             else:
-                self.mpc_solution_render.setData(self.control_solution)
+                self.mpc_solution_render.setData(self.control_solution.T)
 
     def render_local_plan(self, e):
         """

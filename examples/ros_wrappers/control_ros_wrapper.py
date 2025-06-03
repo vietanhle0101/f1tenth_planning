@@ -7,16 +7,16 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 # Change your controller
-from f1tenth_planning.control import (
-    Nonlinear_Dynamic_MPC_Planner as RoboracerController,
-)
+#from f1tenth_planning.control import (
+#    Nonlinear_Dynamic_MPC_Planner as RoboracerController,
+#)
 
 #from f1tenth_planning.control import (
 #    Nonlinear_Kinemtic_MPC_Planner as RoboracerController,
 #)
-#from f1tenth_planning.control import (
-#   Nonlinear_Dynamic_MPPI_Planner as RoboracerController,
-#)
+from f1tenth_planning.control import (
+   Nonlinear_Dynamic_MPPI_Planner as RoboracerController,
+)
 
 from f1tenth_planning.utils.utils import (
     input_steering_speed_to_angle,
@@ -59,18 +59,15 @@ class ControlRosWrapper(Node):
         super().__init__("control_node")
         # Load track waypoints
         waypoints_track: Track = Track.from_raceline_file(
-            os.path.join(os.path.dirname(__file__), "ros_map.csv"),
+            os.path.join(os.path.dirname(__file__), "hill.csv"),
             delimiter=";",
             skip_rows=3,
         )
-        # Make sure the yaw is between 0 and 2*pi
-        waypoints_track.raceline.yaws = np.arctan2(
-            np.sin(waypoints_track.raceline.yaws),
-            np.cos(waypoints_track.raceline.yaws),
-        )
 
         # Multiply the velocity by a factor
-        waypoints_track.raceline.vxs *= 0.5
+        waypoints_track.raceline.vxs *= 1.0
+        # waypoints_track.raceline.vxs = np.where(waypoints_track.raceline.vxs < 1.0, 1.0, waypoints_track.raceline.vxs)  # Ensure min speed
+        # waypoints_track.raceline.vxs = np.where(waypoints_track.raceline.vxs > 2.0, 2.0, waypoints_track.raceline.vxs)  # Ensure max speed
 
         # Create planner
         self.planner = RoboracerController(

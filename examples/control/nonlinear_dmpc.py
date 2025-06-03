@@ -3,7 +3,16 @@ import gymnasium as gym
 from f1tenth_gym.envs import F110Env
 import time
 
+from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control import Nonlinear_Dynamic_MPC_Planner
+from f1tenth_planning.control.config.dynamics_config import (
+    fullscale_params,
+    f1fifth_params,
+    update_config_from_dict,
+)
+
+from f1tenth_gym.envs.f110_env import F110Env
+import os
 
 
 def main():
@@ -20,12 +29,25 @@ def main():
             "num_agents": 1,
             "control_input": "accl",
             "observation_config": {"type": "dynamic_state"},
+            "params": F110Env.f1fifth_vehicle_params(),
         },
         render_mode="human",
     )
 
+    # Load track waypoints
+    waypoints_track: Track = Track.from_raceline_file(
+        os.path.join(os.path.dirname(__file__), "trajectory_log.csv"),
+        delimiter=";",
+        skip_rows=3,
+    )
+
+    # Multiply the velocity by a factor
+    waypoints_track.raceline.vxs *= 1.0
+    waypoints_track.raceline.vxs = np.where(waypoints_track.raceline.vxs < 1.0, 1.0, waypoints_track.raceline.vxs)  # Ensure min speed
+    print(f'Waypoint velocities: {waypoints_track.raceline.vxs}')
+
     # create planner
-    planner = Nonlinear_Dynamic_MPC_Planner(track=env.unwrapped.track)
+    planner = Nonlinear_Dynamic_MPC_Planner(track=waypoints_track, params=f1fifth_params())
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
     env.unwrapped.add_render_callback(planner.render_control_solution)

@@ -33,7 +33,7 @@ def main():
     )
     # Load track waypoints
     waypoints_track: Track = Track.from_raceline_file(
-        os.path.join(os.path.dirname(__file__), "trajectory_log_old.csv"),
+        os.path.join(os.path.dirname(__file__), "trajectory_log.csv"),
         delimiter=";",
         skip_rows=3,
     )

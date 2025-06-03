@@ -1,4 +1,10 @@
+from pathlib import Path
+import os
+jax_cache_dir = Path.home() / "jax_cache"
+jax_cache_dir.mkdir(exist_ok=True)
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 import jax
+jax.config.update("jax_compilation_cache_dir", str(jax_cache_dir))
 import jax.numpy as jnp
 from functools import partial
 from f1tenth_planning.control.dynamics_model import Dynamics_Model

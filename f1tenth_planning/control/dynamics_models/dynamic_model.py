@@ -256,7 +256,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         )
 
         return jax.lax.select(
-            jnp.abs(v) <= 0.5,
+            jnp.abs(v) <= 1.5,
             jnp.array([dx, dy, ddelta, dv, dyaw_ks, ddyaw_ks, dslip_angle_ks]),
             jnp.array([dx, dy, ddelta, dv, dyaw_st, ddyaw_st, dslip_angle_st]),
         )
@@ -338,7 +338,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
             d_beta_fast,  # dbeta/dt = d_beta
         )  # dx/dt = f(x,u)
 
-        RHS = ca.if_else(v >= 0.5, RHS_HIGH_SPEED, RHS_LOW_SPEED)
+        RHS = ca.if_else(v >= 1.5, RHS_HIGH_SPEED, RHS_LOW_SPEED)
 
         return RHS
 
