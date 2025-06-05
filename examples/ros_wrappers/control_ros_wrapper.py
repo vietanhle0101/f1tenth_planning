@@ -4,6 +4,8 @@ from f1tenth_gym.envs import F110Env
 import time
 import os
 import sys
+import argparse
+from pathlib import Path
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 # Change your controller
@@ -55,17 +57,19 @@ except ImportError:
 
 
 class ControlRosWrapper(Node):
-    def __init__(self):
+    def __init__(self, scaling_factor=1.0, raceline='trajectory_logs.csv'):
         super().__init__("control_node")
         # Load track waypoints
         waypoints_track: Track = Track.from_raceline_file(
-            os.path.join(os.path.dirname(__file__), "hill.csv"),
+            # os.path.join("~/cspe_ws/trajectory_logs", raceline), # Points to trajectory_logs
+            # raceline, # If you want to use a relative path or full path
+            os.path.join(os.path.dirname(__file__), raceline), # Current directory
             delimiter=";",
             skip_rows=3,
         )
 
         # Multiply the velocity by a factor
-        waypoints_track.raceline.vxs *= 1.0
+        waypoints_track.raceline.vxs *= scaling_factor
         # waypoints_track.raceline.vxs = np.where(waypoints_track.raceline.vxs < 1.0, 1.0, waypoints_track.raceline.vxs)  # Ensure min speed
         # waypoints_track.raceline.vxs = np.where(waypoints_track.raceline.vxs > 2.0, 2.0, waypoints_track.raceline.vxs)  # Ensure max speed
 
@@ -125,6 +129,7 @@ class ControlRosWrapper(Node):
         self.mpc_solution_marker_array = self._init_marker_array(
             self.planner.config.N, color=(1.0, 0.0, 0.0)
         )
+        self.get_logger().info("Controller node initialized")
 
     def _init_marker_array(self, num_markers, color=(1.0, 0.0, 1.0)):
         marker_array = MarkerArray()
@@ -253,9 +258,27 @@ class ControlRosWrapper(Node):
 
 
 def main(args=None):
+    parser = argparse.ArgumentParser(description="Control ROS Wrapper Node")
+    parser.add_argument(
+        "--vx-scaling",
+        default=1.0,
+        help="Scale the velocity of the waypoints by this factor", 
+        type=float,
+    )
+    parser.add_argument(
+        "--raceline",
+        default="trajectory_logs.csv",
+        help="Path to the raceline file",
+        type=str,
+    )
+    parsed_args, _ = parser.parse_known_args()
+
+    scaling_factor = parsed_args.vx_scaling
+    raceline = parsed_args.raceline
+
     rclpy.init(args=args)
     print("Starting control node...")
-    control_node = ControlRosWrapper()
+    control_node = ControlRosWrapper(scaling_factor=scaling_factor, raceline=raceline)
     rclpy.spin(control_node)
 
     control_node.destroy_node()
