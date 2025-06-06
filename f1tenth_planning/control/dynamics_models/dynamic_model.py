@@ -1,5 +1,4 @@
 from functools import partial
-from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.dynamics_model import Dynamics_Model
 from f1tenth_planning.control.config.dynamics_config import dynamics_config
 
@@ -25,8 +24,8 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         dynamics_config: dynamics_config - vehicle dynamics configuration
     """
 
-    def __init__(self, track: Track, params: dynamics_config):
-        super().__init__(track, params)
+    def __init__(self, params: dynamics_config):
+        super().__init__(params)
         self.nx = 7
         self.nu = 2
 
