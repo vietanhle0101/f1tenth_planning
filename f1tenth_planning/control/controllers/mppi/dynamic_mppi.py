@@ -60,7 +60,7 @@ class Dynamic_MPPI_Planner(Controller):
         self.config.u_min = u_min
         self.config.u_max = u_max
 
-        self.model = Dynamic_Bicycle_Model(self.track, self.params)
+        self.model = Dynamic_Bicycle_Model(self.params)
         self.solver = MPPI(self.config, self.model)
 
         self.x_pred = None
