@@ -61,9 +61,9 @@ class ControlRosWrapper(Node):
         super().__init__("control_node")
         # Load track waypoints
         waypoints_track: Track = Track.from_raceline_file(
-            # os.path.join("~/cspe_ws/trajectory_logs", raceline), # Points to trajectory_logs
+            os.path.abspath(os.path.expanduser(f"~/new_ws/trajectory_logs/{raceline}")),
             # raceline, # If you want to use a relative path or full path
-            os.path.join(os.path.dirname(__file__), raceline), # Current directory
+            # os.path.join(os.path.dirname(__file__), raceline), # Current directory
             delimiter=";",
             skip_rows=3,
         )
