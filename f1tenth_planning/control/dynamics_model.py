@@ -5,20 +5,17 @@ import jax
 from jax import numpy as jnp
 import numpy as np
 import casadi as ca
-from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.config.dynamics_config import dynamics_config
 
 class Dynamics_Model(ABC):
     @abstractmethod
-    def __init__(self, track: Track, params: dynamics_config) -> None:
+    def __init__(self, params: dynamics_config) -> None:
         """
         Initialize the dynamics model.
 
         Args:
-            track (Track): track object with raceline, may be used for frenet coordinates
             params (dynamics_config): vehicle dynamics parameters
         """
-        self.track = track
         self.params = params
 
     @abstractmethod

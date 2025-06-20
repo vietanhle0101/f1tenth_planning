@@ -3,6 +3,7 @@ NMPC waypoint tracker using CasADi. On init, takes in model equation.
 """
 
 import numpy as np
+import jax.numpy as jnp
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.utils.utils import calc_interpolated_reference_trajectory
 from f1tenth_planning.control.controller import Controller
@@ -57,11 +58,34 @@ class Dynamic_MPPI_Planner(Controller):
 
         u_min = np.array([self.params.MIN_DSTEER, self.params.MIN_ACCEL])
         u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
+        self.x_min = jnp.array([
+            -jnp.inf,  # x
+            -jnp.inf,  # y
+            self.params.MIN_STEER,  # delta
+            self.params.MIN_SPEED,  # v
+            -np.pi,  # yaw
+            -np.inf,  # yaw rate
+            -np.inf,  # slip angle
+        ])
+        self.x_max = jnp.array([
+            jnp.inf,  # x
+            jnp.inf,  # y
+            self.params.MAX_STEER,  # delta
+            self.params.MAX_SPEED,  # v
+            np.pi,  # yaw
+            np.inf,  # yaw rate
+            np.inf,  # slip angle
+        ])
+
         self.config.u_min = u_min
         self.config.u_max = u_max
 
-        self.model = Dynamic_Bicycle_Model(self.track, self.params)
+        self.model = Dynamic_Bicycle_Model(self.params)
         self.solver = MPPI(self.config, self.model)
+        # Override the reward function to use the MPPI cost
+        self.solver._reward = self._reward
+        # Override the step function to have clipped states and yaw wrapping
+        self.solver._step = self._step        
 
         self.x_pred = None
         self.ref_traj = None
@@ -71,6 +95,55 @@ class Dynamic_MPPI_Planner(Controller):
 
         self.mpc_solution_render = None
         self.local_plan_render = None
+
+    def _reward(self, x, u, x_ref):
+        """
+        Single-step reward calculated as the negative of the trajectory tracking error calculated using the quadratic cost on all but the yaw, where yaw error is calculated using yaw-normalized error and then scaled by the its factor in the cost matrix.
+        The reward is negative because we want to minimize the cost.
+        Args:
+            x (jnp.ndarray): Current state of the vehicle.
+            u (jnp.ndarray): Control input applied to the vehicle.
+            x_ref (jnp.ndarray): Reference state to track.
+        Returns:
+            jnp.ndarray: The negative cost, which is the reward.
+        """
+        # Calculate the state error
+        e = x - x_ref
+        loss_p1 = e[:4]  # Position and velocity errors
+        loss_p2 = e[5:]  # Yaw rate and slip angle errors
+        cost = (
+            loss_p1.T @ self.config.Q[:4, :4] @ loss_p1 +
+            loss_p2.T @ self.config.Q[5:, 5:] @ loss_p2
+        )
+        # Calculate the yaw-normalized error
+        yaw_error = jnp.arctan2(jnp.sin(e[4]), jnp.cos(e[4]))
+        cost += (
+            self.config.Q[4, 4] * yaw_error**2  # Yaw error scaled by its factor
+        )
+        # Add the control input cost
+        cost += u.T @ self.config.R @ u
+        return -cost
+    
+    def _step(self, x, u):
+        """
+        Single-step state prediction function.
+        """
+        next_state = self.solver.discretizer(self.solver.model.f_jax, x, u, self.solver.p, self.solver.config.dt)
+        # MODULO THE YAW ANGLE TO BE BETWEEN -PI AND PI
+        # MODULO BY CREATING A NEW VECTOR TO AVOID INPLACE MODIFICATION
+        next_state = jnp.array([
+            next_state[0],  # x
+            next_state[1],  # y
+            next_state[2],  # delta
+            next_state[3],  # v
+            (next_state[4] + jnp.pi) % (2 * jnp.pi) - jnp.pi,  # yaw, wrapped to [-pi, pi]
+            next_state[5],  # yaw rate
+            next_state[6]   # slip angle
+        ])
+        # CLIP THE STATES TO BE BETWEEN THE MIN AND MAX VALUES
+        next_state = jnp.clip(next_state, self.x_min, self.x_max)
+        return next_state
+    
 
     def render_control_solution(self, e):
         """

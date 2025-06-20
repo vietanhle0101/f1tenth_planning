@@ -44,7 +44,6 @@ def main():
     # Multiply the velocity by a factor
     waypoints_track.raceline.vxs *= 1.0
     waypoints_track.raceline.vxs = np.where(waypoints_track.raceline.vxs < 1.0, 1.0, waypoints_track.raceline.vxs)  # Ensure min speed
-    print(f'Waypoint velocities: {waypoints_track.raceline.vxs}')
 
     # create planner
     planner = Nonlinear_Dynamic_MPC_Planner(track=waypoints_track, params=f1fifth_params())
