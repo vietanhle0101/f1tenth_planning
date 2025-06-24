@@ -218,13 +218,6 @@ class Dynamic_MPPI_Planner(Controller):
             x, y, cx, cy, v_max_prev, self.config.dt, self.config.N, self.waypoints
         ).T.copy()
 
-        self.ref_traj[4][self.ref_traj[4] - yaw > 4.5] = np.abs(
-            self.ref_traj[4][self.ref_traj[4] - yaw > 4.5] - (2 * np.pi)
-        )
-        self.ref_traj[4][self.ref_traj[4] - yaw < -4.5] = np.abs(
-            self.ref_traj[4][self.ref_traj[4] - yaw < -4.5] + (2 * np.pi)
-        )
-
         opti_params = None
         if params is not None:
             opti_params = self.model.parameters_vector_from_config(params)

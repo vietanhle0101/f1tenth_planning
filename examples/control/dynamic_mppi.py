@@ -5,6 +5,7 @@ import time
 
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control import Nonlinear_Dynamic_MPPI_Planner
+from f1tenth_planning.control.config.controller_config import dynamic_mppi_config
 from f1tenth_planning.control.config.dynamics_config import (
     fullscale_params,
     f1tenth_params,
@@ -42,11 +43,9 @@ def main():
         skip_rows=3,
     )
 
-    # Multiply the velocity by a factor
-    waypoints_track.raceline.vxs *= 1.0
-    # waypoints_track.raceline.vxs = np.where(waypoints_track.raceline.vxs < 1.0, 1.0, waypoints_track.raceline.vxs)  # Ensure min speed
-
     # create planner
+    config = dynamic_mppi_config()
+    config.Q = np.array([25.0, 25.0, 0.0, 1.0, 0.1, 0.0, 0.0])
     planner = Nonlinear_Dynamic_MPPI_Planner(track=waypoints_track, params=f1fifth_params())
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
