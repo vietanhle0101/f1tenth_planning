@@ -70,8 +70,6 @@ class ControlRosWrapper(Node):
 
         # Multiply the velocity by a factor
         waypoints_track.raceline.vxs *= scaling_factor
-        # waypoints_track.raceline.vxs = np.where(waypoints_track.raceline.vxs < 1.0, 1.0, waypoints_track.raceline.vxs)  # Ensure min speed
-        # waypoints_track.raceline.vxs = np.where(waypoints_track.raceline.vxs > 2.0, 2.0, waypoints_track.raceline.vxs)  # Ensure max speed
 
         # Create planner
         self.planner = RoboracerController(
@@ -124,10 +122,10 @@ class ControlRosWrapper(Node):
         )
 
         self.local_plan_marker_array = self._init_marker_array(
-            self.planner.config.N + 1, color=(0.0, 1.0, 0.0)
+            self.planner.solver.config.N + 1, color=(0.0, 1.0, 0.0)
         )
         self.mpc_solution_marker_array = self._init_marker_array(
-            self.planner.config.N, color=(1.0, 0.0, 0.0)
+            self.planner.solver.config.N, color=(1.0, 0.0, 0.0)
         )
         self.get_logger().info("Controller node initialized")
 
