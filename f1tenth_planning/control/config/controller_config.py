@@ -152,7 +152,7 @@ def dynamic_mppi_config():
         nx=7,
         nu=2,
         N=10,
-        Q=np.diag([25.0, 25.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
+        Q=np.diag([5.0, 5.0, 0.0, 1.0, 0.0, 0.0, 0.0]),
         R=np.diag([0.0, 0.00]),
         Rd=np.diag([0.0, 0.00]),
         P=np.diag([25.0, 25.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
@@ -160,7 +160,7 @@ def dynamic_mppi_config():
         n_iterations=1,
         n_samples=512,
         adaptive_covariance=True,
-        scan=True,
+        scan=False,
     )
 
 

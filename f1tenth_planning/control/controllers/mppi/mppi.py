@@ -229,7 +229,7 @@ class MPPI:
 
         return (s, r)
 
-    def solve(self, x0, ref_traj, p=None, Q=None, R=None):
+    def solve(self, x0, ref_traj, vis=True, p=None, Q=None, R=None):
         """
         Solve the MPPI problem for the given initial state and reference trajectory.
         WARNING: Returned arrays are on the GPU, use jax.device_get() to get them on the CPU.
@@ -251,11 +251,15 @@ class MPPI:
 
         # Get the solved for control and state trajectory
         self.uk = self.control_params[0]  # [N, nu]
-        self.xk, _ = self._rollout(self.uk, x0, jax_ref, self.p, self.config.Q, self.config.R)  # [N, nu]
-        self.xk = jnp.concatenate([jnp.expand_dims(x0, axis=0), self.xk], axis=0)
 
-        # Make sure xk and uk are in the right shape
-        self.xk = jnp.transpose(self.xk)  # [nx, N+1]
+        if vis:
+            self.xk, _ = self._rollout(self.uk, x0, jax_ref, self.p, self.config.Q, self.config.R)  # [N, nu]
+            self.xk = jnp.concatenate([jnp.expand_dims(x0, axis=0), self.xk], axis=0)
+
+            # Make sure xk and uk are in the right shape
+            self.xk = jnp.transpose(self.xk)  # [nx, N+1]
+        else:
+            self.xk = jnp.zeros((self.config.nx, self.config.N + 1))  # [nx, N+1]
         self.uk = jnp.transpose(self.uk)  # [nu, N]
 
         return self.xk, self.uk

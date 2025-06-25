@@ -20,7 +20,6 @@ from f1tenth_planning.control.controllers.mppi.mppi import MPPI
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 from f1tenth_planning.utils.utils import jnp_to_np
 
-
 class Dynamic_MPPI_Planner(Controller):
     """
     MPPI Controller, uses CasADi to solve the nonlinear MPC problem using whatever model is passed in.

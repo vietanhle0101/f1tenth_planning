@@ -170,13 +170,17 @@ class ControlRosWrapper(Node):
         return marker_array
 
     def publish_visualizations(self, local_plan, mpc_solution):
-        self.local_plan_pub.publish(
-            self._update_marker_array(self.local_plan_marker_array, local_plan)
-        )
-        self.mpc_solution_pub.publish(
-            self._update_marker_array(self.mpc_solution_marker_array, mpc_solution)
-        )
-        self.global_plan_pub.publish(self.global_plan_marker_array)
+        # Check for subscribers before publishing
+        if self.local_plan_pub.get_subscription_count() > 0:
+            self.local_plan_pub.publish(
+                self._update_marker_array(self.local_plan_marker_array, local_plan)
+            )
+        if self.mpc_solution_pub.get_subscription_count() > 0:
+            self.mpc_solution_pub.publish(
+                self._update_marker_array(self.mpc_solution_marker_array, mpc_solution)
+            )
+        if self.global_plan_pub.get_subscription_count() > 0:
+            self.global_plan_pub.publish(self.global_plan_marker_array)
 
     def pose_callback(self, pose_msg: Odometry):
         if GT_STATE_PUB:
