@@ -1,20 +1,16 @@
-import numpy as np
-import gymnasium as gym
-from f1tenth_gym.envs import F110Env
+import os
 import time
 
+import gymnasium as gym
+import numpy as np
+
+from f1tenth_gym.envs import F110Env
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control import Nonlinear_Dynamic_MPPI_Planner
 from f1tenth_planning.control.config.controller_config import dynamic_mppi_config
 from f1tenth_planning.control.config.dynamics_config import (
-    fullscale_params,
-    f1tenth_params,
     f1fifth_params,
-    update_config_from_dict,
 )
-
-from f1tenth_gym.envs.f110_env import F110Env
-import os
 
 
 def main():

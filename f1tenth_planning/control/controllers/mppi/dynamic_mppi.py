@@ -43,7 +43,6 @@ class Dynamic_MPPI_Planner(Controller):
             params,
             control_mode=(SteerActionEnum.Steering_Speed, LongitudinalActionEnum.Accl),
         )
-        self.config = config
         self.waypoints = np.vstack(
             [
                 track.raceline.xs,  # x
@@ -77,11 +76,11 @@ class Dynamic_MPPI_Planner(Controller):
             np.inf,  # slip angle
         ])
 
-        self.config.u_min = u_min
-        self.config.u_max = u_max
+        config.u_min = u_min
+        config.u_max = u_max
 
         self.model = Dynamic_Bicycle_Model(self.params)
-        self.solver = MPPI(self.config, self.model)
+        self.solver = MPPI(config, self.model)
         # Override the reward function to use the MPPI cost
         self.solver._reward = self._reward
         # Override the step function to have clipped states and yaw wrapping
@@ -96,7 +95,7 @@ class Dynamic_MPPI_Planner(Controller):
         self.mpc_solution_render = None
         self.local_plan_render = None
 
-    def _reward(self, x, u, x_ref):
+    def _reward(self, x, u, x_ref, Q, R):
         """
         Single-step reward calculated as the negative of the trajectory tracking error calculated using the quadratic cost on all but the yaw, where yaw error is calculated using yaw-normalized error and then scaled by the its factor in the cost matrix.
         The reward is negative because we want to minimize the cost.
@@ -112,23 +111,23 @@ class Dynamic_MPPI_Planner(Controller):
         loss_p1 = e[:4]  # Position and velocity errors
         loss_p2 = e[5:]  # Yaw rate and slip angle errors
         cost = (
-            loss_p1.T @ self.config.Q[:4, :4] @ loss_p1 +
-            loss_p2.T @ self.config.Q[5:, 5:] @ loss_p2
+            loss_p1.T @ Q[:4, :4] @ loss_p1 +
+            loss_p2.T @ Q[5:, 5:] @ loss_p2
         )
         # Calculate the yaw-normalized error
         yaw_error = jnp.arctan2(jnp.sin(e[4]), jnp.cos(e[4]))
         cost += (
-            self.config.Q[4, 4] * yaw_error**2  # Yaw error scaled by its factor
+            Q[4, 4] * yaw_error**2  # Yaw error scaled by its factor
         )
         # Add the control input cost
-        cost += u.T @ self.config.R @ u
+        cost += u.T @ R @ u
         return -cost
     
-    def _step(self, x, u):
+    def _step(self, x, u, p):
         """
         Single-step state prediction function.
         """
-        next_state = self.solver.discretizer(self.solver.model.f_jax, x, u, self.solver.p, self.solver.config.dt)
+        next_state = self.solver.discretizer(self.solver.model.f_jax, x, u, p, self.solver.config.dt)
         # MODULO THE YAW ANGLE TO BE BETWEEN -PI AND PI
         # MODULO BY CREATING A NEW VECTOR TO AVOID INPLACE MODIFICATION
         next_state = jnp.array([
@@ -175,7 +174,7 @@ class Dynamic_MPPI_Planner(Controller):
             else:
                 self.local_plan_render.setData(self.local_plan)
 
-    def plan(self, state: dict, waypoints=None, params: dynamics_config = None):
+    def plan(self, state: dict, waypoints=None, params: dynamics_config = None, Q : np.ndarray = None, R: np.ndarray = None):
         """
         Compute the control input for the vehicle using a Kinematic MPC planner.
 
@@ -183,10 +182,9 @@ class Dynamic_MPPI_Planner(Controller):
             state (dict): Dictionary containing the vehicle's state.
             waypoints (numpy.ndarray [N x 5], optional): An array of dynamic waypoints, where each waypoint has
             the format [x, y, delta, velocity, heading]. Overrides the static raceline if provided.
-            Q (np.ndarray, optional): State cost matrix. Defaults to None.
-            R (np.ndarray, optional): Control input cost matrix. Defaults to None.
-            Rd (np.ndarray, optional): Control input derivative cost matrix. Defaults to None.
-            P (np.ndarray, optional): Terminal cost matrix. Defaults to None.
+            params (dynamics_config, optional): Vehicle parameters for the dynamic model. If none, uses default.
+            Q (np.ndarray, optional): State cost matrix. If none, uses default.
+            R (np.ndarray, optional): Control input cost matrix. If none, uses default.
 
         Returns:
             control: A tuple (steering_vel, acc) representing the computed steering velocity and acceleration.
@@ -204,6 +202,18 @@ class Dynamic_MPPI_Planner(Controller):
                     "Please set waypoints to track during planner instantiation or when calling plan()"
                 )
 
+        if Q is not None:
+            if Q.shape != (self.solver.config.Q.shape[0], self.solver.config.Q.shape[1]):
+                raise ValueError(
+                    f"Q must be of shape {self.solver.config.Q.shape}, got {Q.shape}"
+                )
+
+        if R is not None:   
+            if R.shape != (self.solver.config.R.shape[0], self.solver.config.R.shape[1]):
+                raise ValueError(
+                    f"R must be of shape {self.solver.config.R.shape}, got {R.shape}"
+                )
+
         x = state["pose_x"]
         y = state["pose_y"]
         v = state["linear_vel_x"]
@@ -215,15 +225,15 @@ class Dynamic_MPPI_Planner(Controller):
         # v_max_prev = np.max(self.x_pred[3, :]) if self.x_pred is not None else v
         v_max_prev = np.max(self.waypoints[:, 3]) if self.waypoints is not None else v
         self.ref_traj = calc_interpolated_reference_trajectory(
-            x, y, cx, cy, v_max_prev, self.config.dt, self.config.N, self.waypoints
+            x, y, cx, cy, v_max_prev, self.solver.config.dt, self.solver.config.N, self.waypoints
         ).T.copy()
 
-        opti_params = None
+        p = None
         if params is not None:
-            opti_params = self.model.parameters_vector_from_config(params)
+            p = self.model.parameters_vector_from_config(params)
             self.params = params
 
-        self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj.T, p=opti_params)
+        self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj.T, p=p, Q=Q, R=R)
         self.x_pred = jnp_to_np(self.x_pred)
         self.u_pred = jnp_to_np(self.u_pred)
 
