@@ -1,15 +1,19 @@
-from pathlib import Path
 import os
+from pathlib import Path
+
 jax_cache_dir = Path.home() / "jax_cache"
 jax_cache_dir.mkdir(exist_ok=True)
 os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 import jax
+
 jax.config.update("jax_compilation_cache_dir", str(jax_cache_dir))
-import jax.numpy as jnp
 from functools import partial
-from f1tenth_planning.control.dynamics_model import Dynamics_Model
+
+import jax.numpy as jnp
+
 from f1tenth_planning.control.config.controller_config import mppi_config
 from f1tenth_planning.control.discretizers import rk4_discretization
+from f1tenth_planning.control.dynamics_model import Dynamics_Model
 
 
 def truncated_gaussian_sampler(key, mean, low, high, cov):
@@ -82,7 +86,7 @@ class MPPI:
         return (a_opt, a_cov)
 
     @partial(jax.jit, static_argnums=(0))
-    def iteration_step(self, input_, env_state, ref_traj):
+    def iteration_step(self, input_, env_state, ref_traj, p, Q, R):
         a_opt, a_cov, rng = input_
         rng_da, rng = jax.random.split(rng)
         # TODO: FLAG: Check if this is correct
@@ -98,8 +102,8 @@ class MPPI:
         a = a_opt + da  # [n_samples, N, nu]
         a = jnp.clip(a, -self.config.u_max, self.config.u_max)  # [n_samples, N, nu]
 
-        s, r = jax.vmap(self._rollout, in_axes=(0, None, None))(
-            a, env_state, ref_traj
+        s, r = jax.vmap(self._rollout, in_axes=(0, None, None, None, None, None))(
+            a, env_state, ref_traj, p, Q, R
         )  # [n_samples, N]
         R = jax.vmap(self._returns)(r)  # [n_samples, N], pylint: disable=invalid-name
         w = jax.vmap(self._weights, 1, 1)(R)  # [n_samples, N]
@@ -114,22 +118,22 @@ class MPPI:
             a_cov = a_cov + jnp.eye(self.config.nu) * 0.00001
         return (a_opt, a_cov, rng), (a, s, r)
 
-    def _step(self, x, u):
+    def _step(self, x, u, p):
         """
         Single-step state prediction function.
         """
-        return self.discretizer(self.model.f_jax, x, u, self.p, self.config.dt)
+        return self.discretizer(self.model.f_jax, x, u, p, self.config.dt)
 
-    def _reward(self, x, u, x_ref):
+    def _reward(self, x, u, x_ref, Q, R):
         """
         Single-step reward calculated as the negative of the trajectory tracking error (x^T Q x + u^T R u).
         """
         return -(
-            jnp.dot((x - x_ref).T, jnp.dot(self.config.Q, (x - x_ref)))
-            + jnp.dot(u.T, jnp.dot(self.config.R, u))
+            jnp.dot((x - x_ref).T, jnp.dot(Q, (x - x_ref)))
+            + jnp.dot(u.T, jnp.dot(R, u))
         )
 
-    def update(self, x0, ref_traj, control_params, rng):
+    def update(self, x0, ref_traj, control_params, rng, p=None, Q=None, R=None):
         """
         Run the MPPI algorithm for a given initial state and reference trajectory.
 
@@ -142,6 +146,9 @@ class MPPI:
         Returns:
             tuple: updated MPPI state and sampled trajectories
         """
+        self.p = p if p is not None else self.p
+        self.config.Q = Q if Q is not None else self.config.Q
+        self.config.R = R if R is not None else self.config.R
         a_opt, a_cov = control_params
         a_opt = jnp.concatenate(
             [a_opt[1:, :], jnp.expand_dims(jnp.zeros((self.config.nu,)), axis=0)]
@@ -158,23 +165,21 @@ class MPPI:
         if not self.config.scan or self.config.n_iterations == 1:
             for _ in range(self.config.n_iterations):
                 (a_opt, a_cov, rng), (a_sampled, s_sampled, r_sampled) = (
-                    self.iteration_step((a_opt, a_cov, rng), x0, ref_traj)
+                    self.iteration_step((a_opt, a_cov, rng), x0, ref_traj, self.p, self.config.Q, self.config.R)
                 )
         else:
             (a_opt, a_cov, rng), (a_sampled, s_sampled, r_sampled) = jax.lax.scan(
-                lambda input_, _: self.iteration_step(input_, x0, ref_traj),
+                lambda input_, _: self.iteration_step(input_, x0, ref_traj, self.p, self.config.Q, self.config.R)
                 (a_opt, a_cov, rng),
                 None,
                 length=self.config.n_iterations,
             )
         return (a_opt, a_cov), (a_sampled, s_sampled, r_sampled)
 
-    @partial(jax.jit, static_argnums=(0))
     def _returns(self, r):
         # r: [N]
         return jnp.dot(jnp.triu(jnp.ones((self.config.N, self.config.N))), r)  # R: [N]
 
-    @partial(jax.jit, static_argnums=(0))
     def _weights(self, R):  # pylint: disable=invalid-name
         # R: [n_samples]
         # R_stdzd = (R - jnp.min(R)) / ((jnp.max(R) - jnp.min(R)) + self.damping)
@@ -185,7 +190,7 @@ class MPPI:
         return w
 
     @partial(jax.jit, static_argnums=(0))
-    def _rollout(self, u, x0, xref):
+    def _rollout(self, u, x0, xref, p, Q, R):
         """
         Rollout the trajectory given the control inputs and initial state.
 
@@ -201,8 +206,8 @@ class MPPI:
         def rollout_step(x, u):
             state, ind = x
             u = jnp.reshape(u, (self.config.nu,))
-            state = self._step(state, u)
-            r = self._reward(state, u, xref[ind + 1, :])
+            state = self._step(state, u, p)
+            r = self._reward(state, u, xref[ind + 1, :], Q, R)
             x = (state, ind + 1)
             return x, (x, r)
 
@@ -224,7 +229,7 @@ class MPPI:
 
         return (s, r)
 
-    def solve(self, x0, ref_traj, p=None) -> tuple[jnp.ndarray, jnp.ndarray]:
+    def solve(self, x0, ref_traj, p=None, Q=None, R=None):
         """
         Solve the MPPI problem for the given initial state and reference trajectory.
         WARNING: Returned arrays are on the GPU, use jax.device_get() to get them on the CPU.
@@ -237,21 +242,16 @@ class MPPI:
             np.ndarray: optimal control input of shape (nu, N)
             np.ndarray: optimal state trajectory of shape (nx, N+1)
         """
-        if p is not None:
-            # TODO: Clean this up so that we don't have to vectorize then unvectorize
-            self.model.params = self.model.config_from_parameters_vector(p)
-            self.p = p
-
         rng = jax.random.PRNGKey(0)
         jax_x0 = jnp.array(x0)
         jax_ref = jnp.array(ref_traj)
         self.control_params, self.samples = self.update(
-            jax_x0, jax_ref, self.control_params, rng
+            jax_x0, jax_ref, self.control_params, rng, p=p, Q=Q, R=R
         )
 
         # Get the solved for control and state trajectory
         self.uk = self.control_params[0]  # [N, nu]
-        self.xk, _ = self._rollout(self.uk, x0, jax_ref)  # [N, nu]
+        self.xk, _ = self._rollout(self.uk, x0, jax_ref, self.p, self.config.Q, self.config.R)  # [N, nu]
         self.xk = jnp.concatenate([jnp.expand_dims(x0, axis=0), self.xk], axis=0)
 
         # Make sure xk and uk are in the right shape
