@@ -64,6 +64,8 @@ class MPPI:
         self.discretizer = rk4_discretization
         self.control_params = self._init_control()  # [N, nu]
         self.p = self.model.parameters_vector_from_config(self.model.params)
+        self.nu_eye = jnp.eye(self.config.nu)  # [nu, nu]
+        self.nu_zeros = jnp.zeros((self.config.nu,))  # [nu]
 
     def _init_control(self):
         """
@@ -115,7 +117,7 @@ class MPPI:
                 a_cov, 0, w
             )  # a_cov: [N, nu, nu]
             # prevent loss of rank when one sample is heavily weighted
-            a_cov = a_cov + jnp.eye(self.config.nu) * 0.00001
+            a_cov = a_cov + self.nu_eye * 0.00001
         return (a_opt, a_cov, rng), (a, s, r)
 
     def _step(self, x, u, p):
@@ -151,14 +153,14 @@ class MPPI:
         self.config.R = R if R is not None else self.config.R
         a_opt, a_cov = control_params
         a_opt = jnp.concatenate(
-            [a_opt[1:, :], jnp.expand_dims(jnp.zeros((self.config.nu,)), axis=0)]
+            [a_opt[1:, :], jnp.expand_dims(self.nu_zeros, axis=0)]
         )  # [N, nu]
         if self.config.adaptive_covariance:
             a_cov = jnp.concatenate(
                 [
                     a_cov[1:, :],
                     jnp.expand_dims(
-                        (self.config.u_std**2) * jnp.eye(self.config.nu), axis=0
+                        (self.config.u_std**2) * self.nu_eye, axis=0
                     ),
                 ]
             )
