@@ -54,7 +54,7 @@ class Dynamic_MPPI_Planner(Controller):
             ]
         ).T
 
-        u_min = np.array([self.params.MIN_DSTEER, self.params.MIN_ACCEL])
+        u_min = np.array([self.params.MIN_DSTEER, self.params.MIN_ACCEL]) 
         u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
         self.x_min = jnp.array([
             -jnp.inf,  # x
@@ -221,11 +221,8 @@ class Dynamic_MPPI_Planner(Controller):
 
         cx = self.waypoints[:, 0]
         cy = self.waypoints[:, 1]
-        # v_max_prev = np.max(self.x_pred[3, :]) if self.x_pred is not None else v
-        v_max_prev = np.max(self.waypoints[:, 3]) if self.waypoints is not None else v
-        self.ref_traj = calc_interpolated_reference_trajectory(
-            x, y, cx, cy, v_max_prev, self.solver.config.dt, self.solver.config.N, self.waypoints
-        ).T.copy()
+        cv = self.waypoints[:, 3] 
+        self.ref_traj = calc_interpolated_reference_trajectory(x, y, yaw, cx, cy, cv, self.solver.config.dt, self.solver.config.N, self.waypoints, yaw_idx=4).T.copy()
 
         p = None
         if params is not None:
