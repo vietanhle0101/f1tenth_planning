@@ -1,36 +1,18 @@
-import numpy as np
-import gymnasium as gym
-from f1tenth_gym.envs import F110Env
-import time
 import os
 import sys
-import argparse
+import numpy as np
 from pathlib import Path
+import argparse
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-# Change your controller
-#from f1tenth_planning.control import (
-#    Nonlinear_Dynamic_MPC_Planner as RoboracerController,
-#)
-
-#from f1tenth_planning.control import (
-#    Nonlinear_Kinemtic_MPC_Planner as RoboracerController,
-#)
 from f1tenth_planning.control import (
    Nonlinear_Dynamic_MPPI_Planner as RoboracerController,
 )
 
-from f1tenth_planning.utils.utils import (
-    input_steering_speed_to_angle,
-    input_acceleration_to_speed,
-)
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.config.dynamics_config import (
-    fullscale_params,
-    f1fifth_params,
-    update_config_from_dict,
+    f1tenth_params,
 )
-from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 
 import rclpy
 from scipy.spatial.transform import Rotation as R
@@ -46,37 +28,19 @@ from rclpy.qos import (
 )
 from rclpy.node import Node
 
-try:
-    from context_msgs.msg import STControl, STState, STCombined
-    from context_msgs.msg import ParamList
-
-    GT_STATE_PUB = True
-except ImportError:
-    GT_STATE_PUB = False
-    print("context_msgs not found, GT_STATE_PUB will not be used.")
-
-
 class ControlRosWrapper(Node):
-    def __init__(self, scaling_factor=1.0, raceline='trajectory_logs.csv'):
+    def __init__(self, raceline: Path = Path("../trajectory_log.csv"), odom_topic: str = "/fixposition/odometry"):
         super().__init__("control_node")
         # Load track waypoints
         waypoints_track: Track = Track.from_raceline_file(
-            os.path.abspath(os.path.expanduser(f"~/new_ws/trajectory_logs/{raceline}")),
-            # raceline, # If you want to use a relative path or full path
-            # os.path.join(os.path.dirname(__file__), raceline), # Current directory
+            raceline,
             delimiter=";",
             skip_rows=3,
         )
-
-        # Multiply the velocity by a factor
-        waypoints_track.raceline.vxs *= scaling_factor
-
         # Create planner
         self.planner = RoboracerController(
-            track=waypoints_track, params=f1fifth_params()
+            track=waypoints_track, params=f1tenth_params()
         )
-        self.params = f1fifth_params()
-
         # ROS publishers and subscribers
         self.drive_pub = self.create_publisher(AckermannDriveStamped, "/drive", 10)
 
@@ -88,19 +52,8 @@ class ControlRosWrapper(Node):
             liveliness=LivelinessPolicy.AUTOMATIC,
             depth=1,
         )
-
-        if not GT_STATE_PUB:
-            odom_topic = "/fixposition/odometry"  # '/ego_racecar/odom' for f1tenth_gym, '/pf/pose/odom' for f1tenth car
-            self.pose_sub = self.create_subscription(
-                Odometry, odom_topic, self.pose_callback, qos_profile
-            )
-        else:
-            self.pose_sub = self.create_subscription(
-                STCombined, "/ground_truth/combined", self.pose_callback, qos_profile
-            )
-
-        self.param_sub = self.create_subscription(
-            ParamList, "/estimates/current", self.param_update_callback, 10
+        self.pose_sub = self.create_subscription(
+            Odometry, odom_topic, self.pose_callback, qos_profile
         )
 
         self.delta = 0.0
@@ -183,45 +136,32 @@ class ControlRosWrapper(Node):
             self.global_plan_pub.publish(self.global_plan_marker_array)
 
     def pose_callback(self, pose_msg: Odometry):
-        if GT_STATE_PUB:
-            self.delta = pose_msg.control.steering_angle
-            state_dict = {
-                "pose_x": pose_msg.state.x,
-                "pose_y": pose_msg.state.y,
-                "delta": self.delta,
-                "linear_vel_x": pose_msg.state.velocity,
-                "pose_theta": pose_msg.state.yaw,
-                "ang_vel_z": pose_msg.state.yaw_rate,
-                "beta": pose_msg.state.slip_angle,
-            }
-        else:
-            # Get pose
-            x = pose_msg.pose.pose.position.x
-            y = pose_msg.pose.pose.position.y
+        # Get pose
+        x = pose_msg.pose.pose.position.x
+        y = pose_msg.pose.pose.position.y
 
-            pose = pose_msg.pose.pose
-            twist = pose_msg.twist.twist
-            beta = np.arctan2(twist.linear.y, twist.linear.x)
-            quaternion = [
-                pose.orientation.x,
-                pose.orientation.y,
-                pose.orientation.z,
-                pose.orientation.w,
-            ]
-            euler = R.from_quat(quaternion).as_euler("xyz", degrees=False)
-            theta = euler[2]  # Yaw is the third element
+        pose = pose_msg.pose.pose
+        twist = pose_msg.twist.twist
+        beta = np.arctan2(twist.linear.y, twist.linear.x)
+        quaternion = [
+            pose.orientation.x,
+            pose.orientation.y,
+            pose.orientation.z,
+            pose.orientation.w,
+        ]
+        euler = R.from_quat(quaternion).as_euler("xyz", degrees=False)
+        theta = euler[2]  # Yaw is the third element
 
-            state_dict = {
-                "pose_x": x,
-                "pose_y": y,
-                "delta": self.delta,
-                "linear_vel_x": twist.linear.x,
-                "pose_theta": theta,
-                "ang_vel_z": twist.angular.z,
-                "beta": beta,
-            }
+        state_dict = {
+            "pose_x": x,
+            "pose_y": y,
+            "delta": self.delta,
+            "linear_vel_x": twist.linear.x,
+            "pose_theta": theta,
+            "ang_vel_z": twist.angular.z,
+            "beta": beta,
+        }
 
-        # print(f"State: {state_dict}")
         # Plan control commands
         action, info = self.planner.plan(state_dict, params=self.params)
         steer_action = float(action[0])
@@ -250,23 +190,8 @@ class ControlRosWrapper(Node):
         #     f"Steering angle: {steer:.2f}, Speed: {speed:.2f}, Delta: {self.delta:.2f}"
         # )
 
-    def param_update_callback(self, param_msg: ParamList):
-        # Create a dict from param_msg.Params
-        param_dict = {}
-        for param in param_msg.params:
-            param_dict[param.name] = param.value
-        # Update the planner parameters, will be updated internally if supported by controller
-        update_config_from_dict(self.params, param_dict)
-
-
 def main(args=None):
     parser = argparse.ArgumentParser(description="Control ROS Wrapper Node")
-    parser.add_argument(
-        "--vx-scaling",
-        default=1.0,
-        help="Scale the velocity of the waypoints by this factor", 
-        type=float,
-    )
     parser.add_argument(
         "--raceline",
         default="trajectory_logs.csv",
@@ -274,13 +199,11 @@ def main(args=None):
         type=str,
     )
     parsed_args, _ = parser.parse_known_args()
-
-    scaling_factor = parsed_args.vx_scaling
     raceline = parsed_args.raceline
 
     rclpy.init(args=args)
     print("Starting control node...")
-    control_node = ControlRosWrapper(scaling_factor=scaling_factor, raceline=raceline)
+    control_node = ControlRosWrapper(raceline=raceline)
     rclpy.spin(control_node)
 
     control_node.destroy_node()
