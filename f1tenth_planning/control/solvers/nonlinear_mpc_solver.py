@@ -22,10 +22,21 @@ class Nonlinear_MPC_Solver(MPC_Solver):
         self,
         config: mpc_config,
         model: Dynamics_Model,
-        ipopt_opts: dict,
+        ipopt_opts: dict = None,
         discretizer=rk4_discretization,
     ) -> None:
         super().__init__(config, model)
+        if ipopt_opts is None:
+            ipopt_opts = {
+                "ipopt": {
+                    "print_level": 0,
+                    "max_iter": 200,
+                    "acceptable_tol": 1e-2,
+                    "acceptable_obj_change_tol": 1e-3,
+                    "warm_start_init_point": "yes",
+                },
+                "print_time": 0,
+            }
         self.ipopt_opts = ipopt_opts
         self.discretizer = discretizer
         self.init_problem()
@@ -120,7 +131,23 @@ class Nonlinear_MPC_Solver(MPC_Solver):
     def update(self, x0, ref_traj, p=None, Q=None, R=None, P=None, Rd=None):
         super().update(x0, ref_traj, p, Q, R, P, Rd)
 
-    def solve(self, x0, xref, p=None):
+    def solve(self, x0, xref, p=None, Q=None, R=None):
+        """
+        Solve the NMPC problem using CasADi IPOPT solver.
+        Args:
+            x0 (numpy.ndarray): initial state of shape (1, nx)
+            xref (numpy.ndarray): reference trajectory of shape (N+1, nx)
+            p (numpy.ndarray, optional): parameters for the dynamics model of shape (num_params, N+1)
+            Q (numpy.ndarray, optional): state weights matrix of shape (nx, nx)
+            R (numpy.ndarray, optional): control weights matrix of shape (nu, nu)
+        """
+        if x0.shape != (self.config.nx,):
+            raise ValueError(f"x0 must be of shape {(self.config.nx,)}, got {x0.shape}")
+        if xref.shape != (self.config.nx, self.config.N + 1):
+            raise ValueError(
+                f"xref must be of shape {(self.config.nx, self.config.N + 1)}, got {xref.shape}"
+            )
+
         # Only update parameters if they are provided
         if p is not None:
             if p.shape[0] != self.model.num_params:
@@ -136,20 +163,37 @@ class Nonlinear_MPC_Solver(MPC_Solver):
         else:
             p = self.model.parameters_vector_from_config(self.model.params)
             p = np.tile(np.array(p), (1, self.config.N + 1))
-        self.update(x0, xref, p)
 
+        if Q is not None:
+            if Q.shape != (
+                self.config.nx,
+                self.config.nx,
+            ):
+                raise ValueError(
+                    f"Q must be of shape {(self.config.nx, self.config.nx)}, got {Q.shape}"
+                )
+            Warning("Changing Q during solve is not yet implemented.")
+        if R is not None:
+            if R.shape != (
+                self.config.nu,
+                self.config.nu,
+            ):
+                raise ValueError(
+                    f"R must be of shape {(self.config.nu, self.config.nu)}, got {R.shape}"
+                )
+            Warning("Changing R during solve is not yet implemented.")
+        self.update(x0, xref, p, Q, R)
         params_x = ca.horzcat(
-            x0,  # current state
+            x0,  # initial state
             xref[:, 1:],  # reference states
         )
         params_p = ca.DM(p)
-
         self.args["p"] = ca.vertcat(params_x, params_p)
 
         # optimization variable current state
         self.args["x0"] = ca.vertcat(
             ca.reshape(
-                ca.repmat(x0, 1, self.config.N + 1),
+                ca.repmat(x0, self.config.N + 1, 1),
                 self.config.nx * (self.config.N + 1),
                 1,
             ),

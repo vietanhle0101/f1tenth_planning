@@ -6,6 +6,13 @@ import numpy as np
 import casadi as ca
 
 
+def _extract_kinematic_state(x0, xref):
+    """Ensure that the states correspond to the kinematic model states."""
+    # Extract first 5 states: [x, y, steering_angle, vx, yaw], assuming full state is
+    # [x, y, steering_angle, vx, yaw, yaw_rate, slip_angle]
+    return x0[:5], xref[:5, :]
+
+
 class Kinematic_Bicycle_Model(Dynamics_Model):
     """
     Kinematic bicycle model for vehicle dynamics.
