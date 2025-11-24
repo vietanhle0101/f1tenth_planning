@@ -5,6 +5,7 @@ import numpy as np
 from f1tenth_planning.control.config.dynamics_config import dynamics_config
 from f1tenth_planning.control.dynamics_model import Dynamics_Model
 
+
 class ParameterEstimator(ABC):
     @abstractmethod
     def __init__(self, initial_params: dynamics_config, model: Dynamics_Model):
@@ -19,7 +20,13 @@ class ParameterEstimator(ABC):
         self.model = model
 
     @abstractmethod
-    def estiamte(self, state: dict, control: np.ndarray, new_param_guess: dynamics_config = None, **kwargs) -> dynamics_config:
+    def estiamte(
+        self,
+        state: dict,
+        control: np.ndarray,
+        new_param_guess: dynamics_config = None,
+        **kwargs,
+    ) -> dynamics_config:
         """
         Estiamte the parameters of the dynamics model based on the current state and control input. This may use a history of previous states and controls, but internal to the estimator.
 
@@ -33,4 +40,3 @@ class ParameterEstimator(ABC):
             dynamics_config: updated parameters of the dynamics model.
         """
         raise NotImplementedError("control method not implemented")
-

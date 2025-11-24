@@ -1,25 +1,3 @@
-# MIT License
-
-# Copyright (c) Hongrui Zheng, Johannes Betz
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
 """
 Utility functions for motion planners
 
@@ -27,14 +5,11 @@ Author: Hongrui Zheng
 Last Modified: 5/27/21
 """
 
+import math
+
 import jax
 import numpy as np
-import math
 from numba import njit
-
-"""
-Pure Pursuit utilities
-"""
 
 
 @njit(cache=True)
@@ -75,10 +50,11 @@ def nearest_point(point, trajectory):
         min_dist_segment,
     )
 
+
 def calc_ref_trajectory_indices(x, y, cx, cy, v, dt, N):
     """
     Calcuate the indices of the reference trajectory for the next N steps based on the current velocity and the distance between waypoints in the reference trajectory.
-    
+
     Args:
         x (float): current x position
         y (float): current y position
@@ -89,7 +65,7 @@ def calc_ref_trajectory_indices(x, y, cx, cy, v, dt, N):
     """
 
     # Calculate the distance between waypoints in the reference trajectory
-    dl = np.linalg.norm(np.array([cx[1], cy[1]]) - np.array([cx[0], cy[0]]))    
+    dl = np.linalg.norm(np.array([cx[1], cy[1]]) - np.array([cx[0], cy[0]]))
 
     # Find the total number of waypoints in the reference trajectory
     ncourse = len(cx)
@@ -100,14 +76,17 @@ def calc_ref_trajectory_indices(x, y, cx, cy, v, dt, N):
     # based on current velocity, distance traveled on the ref line between time steps
     travel = abs(v) * dt
     dind = travel / dl
-    ind_list = int(ind) + np.insert(
-        np.cumsum(np.repeat(dind, N)), 0, 0
-    ).round().astype(int)
+    ind_list = int(ind) + np.insert(np.cumsum(np.repeat(dind, N)), 0, 0).round().astype(
+        int
+    )
     ind_list[ind_list >= ncourse] -= ncourse
 
     return ind_list
 
-def calc_interpolated_reference_trajectory(x, y, yaw, cx, cy, cv, dt, N, reference_trajectory, yaw_idx=None):
+
+def calc_interpolated_reference_trajectory(
+    x, y, yaw, cx, cy, cv, dt, N, reference_trajectory
+):
     """
     Calculate the interpolated reference trajectory based on the current position and the reference trajectory waypoints.
 
@@ -126,7 +105,7 @@ def calc_interpolated_reference_trajectory(x, y, yaw, cx, cy, cv, dt, N, referen
         ref_list (numpy.ndarray): interpolated reference trajectory
     """
     # Calculate the distance between waypoints in the reference trajectory
-    dl = np.linalg.norm(np.array([cx[1], cy[1]]) - np.array([cx[0], cy[0]]))    
+    dl = np.linalg.norm(np.array([cx[1], cy[1]]) - np.array([cx[0], cy[0]]))
 
     # Find the index closest to the current position and the interpolator t \in [0, 1]
     _, _, t_current, ind_current = nearest_point(np.array([x, y]), np.array([cx, cy]).T)
@@ -134,15 +113,19 @@ def calc_interpolated_reference_trajectory(x, y, yaw, cx, cy, cv, dt, N, referen
     # Find the total number of waypoints in the reference trajectory
     ncourse = len(cx)
 
-    # start from the velocity at the current index, calculate next point, 
+    # start from the velocity at the current index, calculate next point,
     # interpolate linearly the speed and then use that speed to get next point,
     # Repeat this for N points
-    current_speed = (1 - t_current) * cv[ind_current] + t_current * cv[(ind_current + 1) % ncourse]
-    t_list = np.zeros(N+1)
+    current_speed = (1 - t_current) * cv[ind_current] + t_current * cv[
+        (ind_current + 1) % ncourse
+    ]
+    t_list = np.zeros(N + 1)
     t_list[0] = t_current
-    for i in range(1, N+1):
-        t_list[i] = t_list[i-1] + (current_speed * dt) / dl
-        current_speed = (1 - t_list[i]) * cv[ind_current] + t_list[i] * cv[(ind_current + 1) % ncourse]
+    for i in range(1, N + 1):
+        t_list[i] = t_list[i - 1] + (current_speed * dt) / dl
+        current_speed = (1 - t_list[i]) * cv[ind_current] + t_list[i] * cv[
+            (ind_current + 1) % ncourse
+        ]
 
     # Get the indices of the previous point to interpolate with for each point
     ind_list = t_list.astype(int) + ind_current
@@ -158,8 +141,11 @@ def calc_interpolated_reference_trajectory(x, y, yaw, cx, cy, cv, dt, N, referen
     next_states = reference_trajectory[(ind_list + 1) % ncourse, :]
 
     # Interpolate between the previous and next points by (1-t)*ref[i] + t*ref[i+1]
-    ref_list = (1 - t_list).reshape(-1, 1) * prev_states + t_list.reshape(-1, 1) * next_states
+    ref_list = (1 - t_list).reshape(-1, 1) * prev_states + t_list.reshape(
+        -1, 1
+    ) * next_states
     return ref_list
+
 
 @njit(cache=True)
 def intersect_point(point, radius, trajectory, t=0.0, wrap=False):
@@ -395,6 +381,7 @@ def get_rotation_matrix(theta):
 def pi_2_pi(angle):
     return ((angle + math.pi) % (2.0 * math.pi)) - math.pi
 
+
 # @njit(cache=True)
 def sample_traj(clothoid, npts):
     traj = np.empty((npts, 4))
@@ -421,11 +408,13 @@ def input_acceleration_to_speed(v0, acc, dt):
     """
     return v0 + acc * dt
 
+
 def input_steering_speed_to_angle(delta_0, delta_v, dt):
     """
     Returns the steering angle after applying steering velocity for a given time
     """
     return delta_0 + delta_v * dt
+
 
 def jnp_to_np(jnp_array):
     """
