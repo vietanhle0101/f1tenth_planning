@@ -1,25 +1,3 @@
-# MIT License
-
-# Copyright (c) Hongrui Zheng, Johannes Betz
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
 """
 Pure Pursuit waypoint tracker
 
@@ -33,7 +11,10 @@ from f1tenth_planning.utils.utils import intersect_point
 from f1tenth_planning.utils.utils import get_actuation
 from f1tenth_planning.control.controller import Controller
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
-from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1tenth_params
+from f1tenth_planning.control.config.dynamics_config import (
+    dynamics_config,
+    f1tenth_params,
+)
 
 import numpy as np
 import warnings
@@ -51,7 +32,7 @@ class PurePursuitPlanner(Controller):
         track (Track): Track instance containing the raceline information.
         params (dynamics_config, optional): Vehicle dynamic parameters. Defaults to dynamics_config().
         max_reacquire (float, optional): Maximum radius (in meters) to reacquire the current waypoint in case the vehicle drifts. Defaults to 20.0.
-        default_lookahead (float, optional): Default lookahead distance (in meters) to use if not provided during planning. Defaults to 0.8.
+        lookahead_distance (float, optional): Default lookahead distance (in meters) to use if not provided during planning. Defaults to 0.8.
 
     Attributes:
         waypoints (numpy.ndarray [N x 4]): Static list of waypoints to track; columns correspond to [x, y, velocity, heading].
@@ -59,15 +40,26 @@ class PurePursuitPlanner(Controller):
         target_index (int or None): Index of the current waypoint.
     """
 
-    def __init__(self, track: Track, params: dynamics_config = f1tenth_params(), lookahead_distance=2.0, max_reacquire=20.0):
-        super(PurePursuitPlanner, self).__init__(track, params, 
-                                                 control_mode=(SteerActionEnum.Steering_Angle, LongitudinalActionEnum.Speed))
-        self.waypoints = np.vstack([
-            track.raceline.xs,
-            track.raceline.ys,
-            track.raceline.vxs,
-            track.raceline.yaws
-        ]).T
+    def __init__(
+        self,
+        track: Track,
+        params: dynamics_config = f1tenth_params(),
+        lookahead_distance=0.8,
+        max_reacquire=20.0,
+    ):
+        super(PurePursuitPlanner, self).__init__(
+            track,
+            params,
+            control_mode=(SteerActionEnum.Steering_Angle, LongitudinalActionEnum.Speed),
+        )
+        self.waypoints = np.vstack(
+            [
+                track.raceline.xs,
+                track.raceline.ys,
+                track.raceline.vxs,
+                track.raceline.yaws,
+            ]
+        ).T
 
         self.lookahead_distance = lookahead_distance
         self.max_reacquire = max_reacquire
@@ -106,12 +98,14 @@ class PurePursuitPlanner(Controller):
         if self.target_index is not None:
             end_index = self.target_index + 10
             if end_index > self.waypoints.shape[0]:
-                self.local_plan = np.vstack((
-                self.waypoints[self.target_index:, :2],
-                self.waypoints[:end_index % self.waypoints.shape[0], :2]
-                ))
+                self.local_plan = np.vstack(
+                    (
+                        self.waypoints[self.target_index :, :2],
+                        self.waypoints[: end_index % self.waypoints.shape[0], :2],
+                    )
+                )
             else:
-                self.local_plan = self.waypoints[self.target_index:end_index, :2]
+                self.local_plan = self.waypoints[self.target_index : end_index, :2]
             if self.local_plan_render is None:
                 self.local_plan_render = e.render_closed_lines(
                     self.local_plan, color=(0, 0, 128), size=1
@@ -157,7 +151,7 @@ class PurePursuitPlanner(Controller):
         else:
             return None
 
-    def plan(self, state:dict, waypoints=None, lookahead_distance=None):
+    def plan(self, state: dict, waypoints=None, lookahead_distance=None):
         """
         Computes the steering angle and speed command based on the current state of the vehicle
         and the target waypoint found using the lookahead method.
@@ -178,7 +172,9 @@ class PurePursuitPlanner(Controller):
         """
         if waypoints is not None:
             if waypoints.shape[1] < 3 or len(waypoints.shape) != 2:
-                raise ValueError("Waypoints need to be a (N x m) numpy array with m >= 3!")
+                raise ValueError(
+                    "Waypoints need to be a (N x m) numpy array with m >= 3!"
+                )
             self.waypoints = waypoints
         else:
             if self.waypoints is None:
@@ -186,7 +182,7 @@ class PurePursuitPlanner(Controller):
                     "Please set waypoints to track during planner instantiation or when calling plan()"
                 )
         if lookahead_distance is not None:
-            self.default_lookahead = lookahead_distance
+            self.lookahead_distance = lookahead_distance
 
         pose_x = state["pose_x"]
         pose_y = state["pose_y"]
@@ -212,12 +208,14 @@ class PurePursuitPlanner(Controller):
 
         end_index = self.target_index + 10
         if end_index > self.waypoints.shape[0]:
-            self.local_plan = np.vstack((
-            self.waypoints[self.target_index:, :2],
-            self.waypoints[:end_index % self.waypoints.shape[0], :2]
-            ))
+            self.local_plan = np.vstack(
+                (
+                    self.waypoints[self.target_index :, :2],
+                    self.waypoints[: end_index % self.waypoints.shape[0], :2],
+                )
+            )
         else:
-            self.local_plan = self.waypoints[self.target_index:end_index, :2]
+            self.local_plan = self.waypoints[self.target_index : end_index, :2]
         self.control_solution = self.lookahead_point[:2][None]
 
         return steering_angle, speed

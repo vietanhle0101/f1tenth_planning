@@ -5,7 +5,6 @@ import pathlib
 import numpy as np
 import rclpy
 from ackermann_msgs.msg import AckermannDriveStamped
-from f1tenth_gym.envs.action import LongitudinalActionEnum, SteerActionEnum
 from f1tenth_gym.envs.track import Track
 from nav_msgs.msg import Odometry
 from rclpy.node import Node

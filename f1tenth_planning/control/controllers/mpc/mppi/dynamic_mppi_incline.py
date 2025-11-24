@@ -4,9 +4,6 @@ from f1tenth_planning.control.config.dynamics_config import (
     dynamics_config,
     f1tenth_params,
 )
-from f1tenth_planning.control.dynamics_models.dynamic_model_inclined import (
-    Incline_Dynamic_Bicycle_Model,
-)
 from f1tenth_planning.control.config.controller_config import (
     mpc_config,
     dynamic_mppi_config,

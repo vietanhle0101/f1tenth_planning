@@ -32,8 +32,6 @@ import gymnasium as gym
 from f1tenth_gym.envs import F110Env
 import time
 
-from f1tenth_planning.control.dynamic_mpc.dynamic_mpc import STMPCPlanner
-
 
 def main():
     """
