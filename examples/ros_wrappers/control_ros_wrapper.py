@@ -48,7 +48,6 @@ class ControlRosWrapper(Node):
         self.planner = RoboracerController(
             track=waypoints_track, params=f1tenth_params()
         )
-
         # ROS publishers and subscribers
         self.drive_pub = self.create_publisher(AckermannDriveStamped, drive_topic, 10)
 
@@ -169,7 +168,6 @@ class ControlRosWrapper(Node):
             "beta": beta,
         }
 
-        # print(f"State: {state_dict}")
         # Plan control commands
         action, info = self.planner.plan(state_dict, params=self.params)
         steer_action = float(action[0])
