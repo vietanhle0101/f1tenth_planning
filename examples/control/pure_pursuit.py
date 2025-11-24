@@ -2,13 +2,11 @@ import numpy as np
 import gymnasium as gym
 
 from f1tenth_planning.control import PurePursuitPlanner
-from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control.config.dynamics_config import (
     f1tenth_params,
 )
 
 from f1tenth_gym.envs.f110_env import F110Env
-import os
 
 
 def main():

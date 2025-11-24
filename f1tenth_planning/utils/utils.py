@@ -102,7 +102,7 @@ def calc_interpolated_reference_trajectory(
         reference_trajectory (numpy.ndarray): reference trajectory waypoints
 
     Returns:
-        ref_list (numpy.ndarray): interpolated reference trajectory
+        ref_list (numpy.ndarray): interpolated reference trajectory of shape (N+1, nx) where nx is the number of state variables
     """
     # Calculate the distance between waypoints in the reference trajectory
     dl = np.linalg.norm(np.array([cx[1], cy[1]]) - np.array([cx[0], cy[0]]))

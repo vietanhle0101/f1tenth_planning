@@ -2,10 +2,6 @@ import numpy as np
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.utils.utils import calc_interpolated_reference_trajectory
 from f1tenth_planning.control.controller import Controller
-from f1tenth_planning.control.config.controller_config import (
-    dynamic_mppi_config,
-    mpc_config,
-)
 from f1tenth_planning.control.config.dynamics_config import (
     dynamics_config,
     f1tenth_params,
@@ -24,7 +20,12 @@ class MPC_Controller(Controller):
 
     Args:
         track (f1tenth_gym_ros:Track): track object, contains the reference raceline
-        config (mpc_config, optional): MPC configuration object, contains MPC costs and constraints
+        solver (MPC_Solver): MPC solver object, contains MPC parameters
+        model (Dynamics_Model): dynamics model object, contains the vehicle dynamics
+        params (dynamics_config, optional): Vehicle parameters for the model. If none,
+            default f1tenth_params() will be used.
+        pre_processing_fn (function, optional): Function to preprocess the state and reference trajectory before calling the solver.
+            Should take in (x0, xref) and return processed (x0, xref). If none, no preprocessing is done.
     """
 
     def __init__(
@@ -153,6 +154,7 @@ class MPC_Controller(Controller):
         y = state["pose_y"]
         v = state["linear_vel_x"]
         yaw = state["pose_theta"]
+        # x0 of shape (nx,)
         x0 = np.array([x, y, state["delta"], v, yaw, state["ang_vel_z"], state["beta"]])
 
         cx = self.waypoints[:, 0]
@@ -178,16 +180,9 @@ class MPC_Controller(Controller):
         if self.pre_processing_fn is not None:
             x0, self.ref_traj = self.pre_processing_fn(x0, self.ref_traj)
 
-        self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj.T, p=p, Q=Q, R=R)
+        self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj, p=p, Q=Q, R=R)
         self.x_pred = jnp_to_np(self.x_pred)
         self.u_pred = jnp_to_np(self.u_pred)
-
         self.local_plan = self.ref_traj[:2].T
         self.control_solution = np.array(self.x_pred[:2, :])
-
-        return np.array(self.u_pred[:, 0]).flatten(), {
-            "predicted_state": self.x_pred,
-            "predicted_control": self.u_pred,
-            "steering_angle": self.x_pred[2, 1],
-            "velocity": self.x_pred[3, 1],
-        }
+        return np.array(self.u_pred[:, 0]).flatten()

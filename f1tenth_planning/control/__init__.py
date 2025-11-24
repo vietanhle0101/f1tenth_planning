@@ -9,6 +9,3 @@ from .controllers.mpc.nonlinear_mpc.nonlinear_dmpc import Nonlinear_Dynamic_MPC_
 from .controllers.mpc.mppi.dynamic_mppi import (
     Dynamic_MPPI_Planner as Nonlinear_Dynamic_MPPI_Planner,
 )
-from .controllers.mpc.mppi.dynamic_mppi_incline import (
-    Incline_Dynamic_MPPI_Planner as Nonlinear_Dynamic_Incline_MPPI_Planner,
-)
