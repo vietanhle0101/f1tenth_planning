@@ -3,16 +3,10 @@ import gymnasium as gym
 from f1tenth_gym.envs import F110Env
 import time
 
-from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control import Nonlinear_Dynamic_MPC_Planner
 from f1tenth_planning.control.config.dynamics_config import (
-    fullscale_params,
-    f1fifth_params,
-    update_config_from_dict,
+    f1tenth_params,
 )
-
-from f1tenth_gym.envs.f110_env import F110Env
-import os
 
 
 def main():
@@ -25,28 +19,18 @@ def main():
     env: F110Env = gym.make(
         "f1tenth_gym:f1tenth-v0",
         config={
-            "map": "Spielberg_blank",
+            "map": "Spielberg",
             "num_agents": 1,
             "control_input": "accl",
             "observation_config": {"type": "dynamic_state"},
-            "params": F110Env.f1fifth_vehicle_params(),
+            "params": F110Env.f1tenth_vehicle_params(),
         },
         render_mode="human",
     )
-
-    # Load track waypoints
-    waypoints_track: Track = Track.from_raceline_file(
-        os.path.join(os.path.dirname(__file__), "trajectory_log.csv"),
-        delimiter=";",
-        skip_rows=3,
-    )
-
-    # Multiply the velocity by a factor
-    waypoints_track.raceline.vxs *= 1.0
-    waypoints_track.raceline.vxs = np.where(waypoints_track.raceline.vxs < 1.0, 1.0, waypoints_track.raceline.vxs)  # Ensure min speed
-
     # create planner
-    planner = Nonlinear_Dynamic_MPC_Planner(track=waypoints_track, params=f1fifth_params())
+    planner = Nonlinear_Dynamic_MPC_Planner(
+        track=env.unwrapped.track, params=f1tenth_params()
+    )
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
     env.unwrapped.add_render_callback(planner.render_control_solution)
@@ -55,9 +39,9 @@ def main():
     poses = np.array(
         [
             [
-                env.track.raceline.xs[0],
-                env.track.raceline.ys[0],
-                env.track.raceline.yaws[0],
+                env.unwrapped.track.raceline.xs[0],
+                env.unwrapped.track.raceline.ys[0],
+                env.unwrapped.track.raceline.yaws[0],
             ]
         ]
     )
@@ -68,7 +52,7 @@ def main():
     laptime = 0.0
     start = time.time()
     while not done:
-        (steerv, accl), _ = planner.plan(obs["agent_0"])
+        steerv, accl = planner.plan(obs["agent_0"])
         obs, timestep, terminated, truncated, infos = env.step(
             np.array([[steerv, accl]])
         )

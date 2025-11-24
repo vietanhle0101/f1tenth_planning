@@ -1,7 +1,7 @@
 from f1tenth_planning.control.controllers.mpc.mpc import MPC_Controller
 from f1tenth_planning.control.config.controller_config import (
     mpc_config,
-    kinematic_mpc_config,
+    dynamic_mpc_config,
 )
 from f1tenth_planning.control.dynamics_models.dynamic_model import Dynamic_Bicycle_Model
 from f1tenth_planning.control.solvers.nonlinear_mpc_solver import Nonlinear_MPC_Solver
@@ -35,9 +35,9 @@ class Nonlinear_Dynamic_MPC_Planner(MPC_Controller):
         if model is None:
             model = Dynamic_Bicycle_Model(params)
         if config is None:
-            config = kinematic_mpc_config()
+            config = dynamic_mpc_config()
         if solver is None:
-            solver = Nonlinear_MPC_Solver(model, config)
+            solver = Nonlinear_MPC_Solver(config=config, model=model)
         super(Nonlinear_Dynamic_MPC_Planner, self).__init__(
             track,
             solver,
