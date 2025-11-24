@@ -1,19 +1,19 @@
 import os
-from pathlib import Path
-
-jax_cache_dir = Path.home() / "jax_cache"
-jax_cache_dir.mkdir(exist_ok=True)
-os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
 import jax
-
-jax.config.update("jax_compilation_cache_dir", str(jax_cache_dir))
-from functools import partial
-
 import jax.numpy as jnp
+from pathlib import Path
+from functools import partial
 
 from f1tenth_planning.control.config.controller_config import mppi_config
 from f1tenth_planning.control.discretizers import rk4_discretization
 from f1tenth_planning.control.dynamics_model import Dynamics_Model
+from f1tenth_planning.control.mpc_solver import MPC_Solver
+
+jax_cache_dir = Path.home() / "jax_cache"
+jax_cache_dir.mkdir(exist_ok=True)
+os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"] = "false"
+
+jax.config.update("jax_compilation_cache_dir", str(jax_cache_dir))
 
 
 def truncated_gaussian_sampler(key, mean, low, high, cov):
@@ -48,7 +48,7 @@ def truncated_gaussian_sampler(key, mean, low, high, cov):
     return mean + R @ samples
 
 
-class MPPI:
+class MPPI_Solver(MPC_Solver):
     """
     Path-tracking Model Predictive Path Integral (MPPI) controller.
     paper: https://arxiv.org/pdf/1707.02342 | base code: https://github.com/google-research/google-research/tree/master/jax_mpc
@@ -58,10 +58,32 @@ class MPPI:
         model (Dynamics_Model): dynamics model object, used to compute the state derivative
     """
 
-    def __init__(self, config: mppi_config, model: Dynamics_Model):
-        self.config = config
-        self.model = model
-        self.discretizer = rk4_discretization
+    def __init__(
+        self,
+        config: mppi_config,
+        model: Dynamics_Model,
+        discretizer=rk4_discretization,
+        step_function=None,
+        reward_function=None,
+    ) -> None:
+        """
+        Initialize the MPPI solver.
+        Args:
+            config (mppi_config): MPPI configuration object, contains MPPI costs and constraints
+            model (Dynamics_Model): dynamics model object, used to compute the state derivative
+            discretizer (function, optional): function to discretize the continuous-time dynamics. Defaults to rk4_discretization.
+            step_function (function, optional): function of the form _step(self, x, u, p) to compute the next state given current state and control input. If None, uses the discretizer with model's f_jax
+            reward_function (function, optional): function of the form _reward(self, x, u, x_ref, Q, R) to compute the reward given current state, control input, reference state, Q, and R. If None, uses the default quadratic cost
+        Returns:
+            None
+        """
+        super().__init__(config, model)
+        self.config: mppi_config = self.config  # For type hinting
+        self.discretizer = discretizer
+        if step_function is not None:
+            self._step = step_function
+        if reward_function is not None:
+            self._reward = reward_function
         self.control_params = self._init_control()  # [N, nu]
         self.p = self.model.parameters_vector_from_config(self.model.params)
         self.nu_eye = jnp.eye(self.config.nu)  # [nu, nu]
@@ -135,48 +157,21 @@ class MPPI:
             + jnp.dot(u.T, jnp.dot(R, u))
         )
 
-    def update(self, x0, ref_traj, control_params, rng, p=None, Q=None, R=None):
+    def update(self, x0, ref_traj, p=None, Q=None, R=None):
         """
-        Run the MPPI algorithm for a given initial state and reference trajectory.
-
+        Update the parameters of the MPPI solver for the next solve iteration.
+        Optionally, custom dynamics parameters and cost matrices can be provided.
         Args:
             x0 (np.ndarray): initial state of shape (nx,)
-            ref_traj (np.ndarray): reference trajectory of shape (N+1, nx)
-            control_params (tuple): current MPPI control parameters (a_opt, a_cov)
-            rng (jax.random.PRNGKey): random key for sampling
-
+            xref (np.ndarray): reference trajectory of shape (nx, N+1)
+            p (np.ndarray, optional): custom dynamics parameters vector. If None, uses default.
+            Q (np.ndarray, optional): custom state cost matrix. If None, uses default.
+            R (np.ndarray, optional): custom control input cost matrix. If None, uses default
         Returns:
-            tuple: updated MPPI state and sampled trajectories
+            None
         """
-        self.p = p if p is not None else self.p
-        self.config.Q = Q if Q is not None else self.config.Q
-        self.config.R = R if R is not None else self.config.R
-        a_opt, a_cov = control_params
-        a_opt = jnp.concatenate(
-            [a_opt[1:, :], jnp.expand_dims(self.nu_zeros, axis=0)]
-        )  # [N, nu]
-        if self.config.adaptive_covariance:
-            a_cov = jnp.concatenate(
-                [
-                    a_cov[1:, :],
-                    jnp.expand_dims(
-                        (self.config.u_std**2) * self.nu_eye, axis=0
-                    ),
-                ]
-            )
-        if not self.config.scan or self.config.n_iterations == 1:
-            for _ in range(self.config.n_iterations):
-                (a_opt, a_cov, rng), (a_sampled, s_sampled, r_sampled) = (
-                    self.iteration_step((a_opt, a_cov, rng), x0, ref_traj, self.p, self.config.Q, self.config.R)
-                )
-        else:
-            (a_opt, a_cov, rng), (a_sampled, s_sampled, r_sampled) = jax.lax.scan(
-                lambda input_, _: self.iteration_step(input_, x0, ref_traj, self.p, self.config.Q, self.config.R)
-                (a_opt, a_cov, rng),
-                None,
-                length=self.config.n_iterations,
-            )
-        return (a_opt, a_cov), (a_sampled, s_sampled, r_sampled)
+        super().update(x0, ref_traj, p=p, Q=Q, R=R)
+        return
 
     def _returns(self, r):
         # r: [N]
@@ -244,18 +239,57 @@ class MPPI:
             np.ndarray: optimal control input of shape (nu, N)
             np.ndarray: optimal state trajectory of shape (nx, N+1)
         """
+        # Update the parameters of the optimization problem
+        super().update(x0, ref_traj, p=p, Q=Q, R=R)
+
+        # Run MPPI iterations
         rng = jax.random.PRNGKey(0)
         jax_x0 = jnp.array(x0)
         jax_ref = jnp.array(ref_traj)
-        self.control_params, self.samples = self.update(
-            jax_x0, jax_ref, self.control_params, rng, p=p, Q=Q, R=R
+        a_opt, a_cov = self.control_params
+        a_opt = jnp.concatenate(
+            [a_opt[1:, :], jnp.expand_dims(self.nu_zeros, axis=0)]
+        )  # [N, nu]
+        if self.config.adaptive_covariance:
+            a_cov = jnp.concatenate(
+                [
+                    a_cov[1:, :],
+                    jnp.expand_dims((self.config.u_std**2) * self.nu_eye, axis=0),
+                ]
+            )
+        if not self.config.scan or self.config.n_iterations == 1:
+            for _ in range(self.config.n_iterations):
+                (a_opt, a_cov, rng), (a_sampled, s_sampled, r_sampled) = (
+                    self.iteration_step(
+                        (a_opt, a_cov, rng),
+                        jax_x0,
+                        jax_ref,
+                        self.p,
+                        self.config.Q,
+                        self.config.R,
+                    )
+                )
+        else:
+            (a_opt, a_cov, rng), (a_sampled, s_sampled, r_sampled) = jax.lax.scan(
+                lambda input_, _: self.iteration_step(
+                    input_, jax_x0, jax_ref, self.p, self.config.Q, self.config.R
+                )(a_opt, a_cov, rng),
+                None,
+                length=self.config.n_iterations,
+            )
+        self.control_params, self.samples = (
+            (a_opt, a_cov),
+            (a_sampled, s_sampled, r_sampled),
         )
 
-        # Get the solved for control and state trajectory
+        # Get the solved for controls
         self.uk = self.control_params[0]  # [N, nu]
 
+        # Optionally rollout the optimal trajectory for visualization
         if vis:
-            self.xk, _ = self._rollout(self.uk, x0, jax_ref, self.p, self.config.Q, self.config.R)  # [N, nu]
+            self.xk, _ = self._rollout(
+                self.uk, x0, jax_ref, self.p, self.config.Q, self.config.R
+            )  # [N, nu]
             self.xk = jnp.concatenate([jnp.expand_dims(x0, axis=0), self.xk], axis=0)
 
             # Make sure xk and uk are in the right shape
@@ -263,5 +297,4 @@ class MPPI:
         else:
             self.xk = jnp.zeros((self.config.nx, self.config.N + 1))  # [nx, N+1]
         self.uk = jnp.transpose(self.uk)  # [nu, N]
-
         return self.xk, self.uk

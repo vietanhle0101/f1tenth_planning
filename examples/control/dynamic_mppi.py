@@ -9,7 +9,7 @@ from f1tenth_gym.envs.track import Track
 from f1tenth_planning.control import Nonlinear_Dynamic_MPPI_Planner
 from f1tenth_planning.control.config.controller_config import dynamic_mppi_config
 from f1tenth_planning.control.config.dynamics_config import (
-    f1fifth_params,
+    f1tenth_params,
 )
 
 
@@ -27,7 +27,7 @@ def main():
             "num_agents": 1,
             "control_input": "accl",
             "observation_config": {"type": "dynamic_state"},
-            "params": F110Env.f1fifth_vehicle_params(),
+            "params": F110Env.f1tenth_vehicle_params(),
         },
         render_mode="human",
     )
@@ -38,11 +38,19 @@ def main():
         delimiter=";",
         skip_rows=3,
     )
+    waypoints_track = env.unwrapped.track
 
     # create planner
     config = dynamic_mppi_config()
-    config.Q = np.array([25.0, 25.0, 0.0, 1.0, 0.1, 0.0, 0.0])
-    planner = Nonlinear_Dynamic_MPPI_Planner(track=waypoints_track, params=f1fifth_params())
+    config.dt = 0.05  # 60 Hz
+    config.N = 20
+    params = f1tenth_params()
+    # config.Q = np.array([25.0, 25.0, 0.0, 1.0, 0.1, 0.0, 0.0])
+    planner = Nonlinear_Dynamic_MPPI_Planner(track=waypoints_track,
+                                             model=None, 
+                                             solver=None, 
+                                             params=params, 
+                                             config=config)
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
     env.unwrapped.add_render_callback(planner.render_control_solution)

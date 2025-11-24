@@ -1,28 +1,24 @@
-"""
-NMPC waypoint tracker using CasADi. On init, takes in model equation.
-"""
-
 import numpy as np
 from f1tenth_gym.envs.track import Track
 from f1tenth_planning.utils.utils import calc_interpolated_reference_trajectory
 from f1tenth_planning.control.controller import Controller
-from f1tenth_planning.control.config.controller_config import mpc_config, kinematic_mpc_config
+from f1tenth_planning.control.config.controller_config import (
+    dynamic_mppi_config,
+    mpc_config,
+)
 from f1tenth_planning.control.config.dynamics_config import (
     dynamics_config,
     f1tenth_params,
 )
-from f1tenth_planning.control.dynamics_models.kinematic_model import (
-    Kinematic_Bicycle_Model,
-)
-from f1tenth_planning.control.controllers.nonlinear_mpc.nonlinear_mpc import (
-    Nonlinear_MPC_Solver,
-)
+from f1tenth_planning.control.mpc_solver import MPC_Solver
+from f1tenth_planning.control.dynamics_model import Dynamics_Model
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
+from f1tenth_planning.utils.utils import jnp_to_np
 
 
-class Kinematic_NMPC_Planner(Controller):
+class MPC_Controller(Controller):
     """
-    NMPC Controller, uses CasADi to solve the nonlinear MPC problem using whatever model is passed in.
+    MPPI Controller, uses CasADi to solve the nonlinear MPC problem using whatever model is passed in.
 
     All vehicle pose used by the planner should be in the map frame.
 
@@ -34,15 +30,16 @@ class Kinematic_NMPC_Planner(Controller):
     def __init__(
         self,
         track: Track,
+        solver: MPC_Solver,
+        model: Dynamics_Model,
         params: dynamics_config = f1tenth_params(),
-        config=kinematic_mpc_config(),
+        pre_processing_fn=None,
     ):
-        super(Kinematic_NMPC_Planner, self).__init__(
+        super().__init__(
             track,
             params,
             control_mode=(SteerActionEnum.Steering_Speed, LongitudinalActionEnum.Accl),
         )
-        self.config = config
         self.waypoints = np.vstack(
             [
                 track.raceline.xs,  # x
@@ -50,30 +47,15 @@ class Kinematic_NMPC_Planner(Controller):
                 np.zeros_like(track.raceline.xs),  # steering angle reference
                 track.raceline.vxs,  # v
                 track.raceline.yaws,  # yaw
+                np.zeros_like(track.raceline.xs),  # yaw rate reference
+                np.zeros_like(track.raceline.xs),  # slip angle
             ]
         ).T
 
-        x_min = np.array(
-            [-np.inf, -np.inf, self.params.MIN_STEER, self.params.MIN_SPEED, -np.inf]
-        )
-        x_max = np.array(
-            [+np.inf, +np.inf, self.params.MAX_STEER, self.params.MAX_SPEED, +np.inf]
-        )
-        u_min = np.array([self.params.MIN_DSTEER, self.params.MIN_ACCEL])
-        u_max = np.array([self.params.MAX_DSTEER, self.params.MAX_ACCEL])
+        self.model = model
+        self.solver = solver
 
-        self.model = Kinematic_Bicycle_Model(self.track, self.params)
-        ipopt_opts = {
-            "ipopt": {
-                "print_level": 0,
-                "max_iter": 200,
-                "acceptable_tol": 1e-2,
-                "acceptable_obj_change_tol": 1e-3,
-                "warm_start_init_point": "yes",
-            },
-            "print_time": 0,
-        }
-        self.solver = Nonlinear_MPC_Solver(self.config, self.model, ipopt_opts)
+        self.pre_processing_fn = pre_processing_fn
 
         self.x_pred = None
         self.ref_traj = None
@@ -92,13 +74,12 @@ class Kinematic_NMPC_Planner(Controller):
             e: The environment renderer instance used for drawing.
         """
         if self.x_pred is not None:
-            self.control_solution = np.array(self.x_pred[:2, :]).T
             if self.mpc_solution_render is None:
                 self.mpc_solution_render = e.render_points(
-                    self.control_solution, color=(128, 0, 0), size=4
+                    self.control_solution.T, color=(128, 0, 0), size=4
                 )
             else:
-                self.mpc_solution_render.setData(self.control_solution)
+                self.mpc_solution_render.setData(self.control_solution.T)
 
     def render_local_plan(self, e):
         """
@@ -108,7 +89,6 @@ class Kinematic_NMPC_Planner(Controller):
             e: The environment renderer instance used for drawing.
         """
         if self.ref_traj is not None:
-            self.local_plan = self.ref_traj[:2].T
             if self.local_plan_render is None:
                 self.local_plan_render = e.render_closed_lines(
                     self.local_plan, color=(0, 0, 128), size=4
@@ -116,7 +96,14 @@ class Kinematic_NMPC_Planner(Controller):
             else:
                 self.local_plan_render.setData(self.local_plan)
 
-    def plan(self, state: dict, waypoints=None, params: dynamics_config = None):
+    def plan(
+        self,
+        state: dict,
+        waypoints=None,
+        params: dynamics_config = None,
+        Q: np.ndarray = None,
+        R: np.ndarray = None,
+    ):
         """
         Compute the control input for the vehicle using a Kinematic MPC planner.
 
@@ -124,10 +111,9 @@ class Kinematic_NMPC_Planner(Controller):
             state (dict): Dictionary containing the vehicle's state.
             waypoints (numpy.ndarray [N x 5], optional): An array of dynamic waypoints, where each waypoint has
             the format [x, y, delta, velocity, heading]. Overrides the static raceline if provided.
-            Q (np.ndarray, optional): State cost matrix. Defaults to None.
-            R (np.ndarray, optional): Control input cost matrix. Defaults to None.
-            Rd (np.ndarray, optional): Control input derivative cost matrix. Defaults to None.
-            P (np.ndarray, optional): Terminal cost matrix. Defaults to None.
+            params (dynamics_config, optional): Vehicle parameters for the dynamic model. If none, uses default.
+            Q (np.ndarray, optional): State cost matrix. If none, uses default.
+            R (np.ndarray, optional): Control input cost matrix. If none, uses default.
 
         Returns:
             control: A tuple (steering_vel, acc) representing the computed steering velocity and acceleration.
@@ -145,34 +131,63 @@ class Kinematic_NMPC_Planner(Controller):
                     "Please set waypoints to track during planner instantiation or when calling plan()"
                 )
 
+        if Q is not None:
+            if Q.shape != (
+                self.solver.config.Q.shape[0],
+                self.solver.config.Q.shape[1],
+            ):
+                raise ValueError(
+                    f"Q must be of shape {self.solver.config.Q.shape}, got {Q.shape}"
+                )
+
+        if R is not None:
+            if R.shape != (
+                self.solver.config.R.shape[0],
+                self.solver.config.R.shape[1],
+            ):
+                raise ValueError(
+                    f"R must be of shape {self.solver.config.R.shape}, got {R.shape}"
+                )
+
         x = state["pose_x"]
         y = state["pose_y"]
         v = state["linear_vel_x"]
         yaw = state["pose_theta"]
-        x0 = np.array([x, y, state["delta"], v, yaw])
+        x0 = np.array([x, y, state["delta"], v, yaw, state["ang_vel_z"], state["beta"]])
 
         cx = self.waypoints[:, 0]
         cy = self.waypoints[:, 1]
-        v_max_prev = np.mean(self.x_pred[3, :]) if self.x_pred is not None else v
+        cv = self.waypoints[:, 3]
+
         self.ref_traj = calc_interpolated_reference_trajectory(
-            x, y, cx, cy, v_max_prev, self.config.dt, self.config.N, self.waypoints
+            x,
+            y,
+            yaw,
+            cx,
+            cy,
+            cv,
+            self.solver.config.dt,
+            self.solver.config.N,
+            self.waypoints,
         ).T.copy()
-
-        self.ref_traj[-1][self.ref_traj[-1] - yaw > 4.5] = np.abs(
-            self.ref_traj[-1][self.ref_traj[-1] - yaw > 4.5] - (2 * np.pi)
-        )
-        self.ref_traj[-1][self.ref_traj[-1] - yaw < -4.5] = np.abs(
-            self.ref_traj[-1][self.ref_traj[-1] - yaw < -4.5] + (2 * np.pi)
-        )
-
-        opti_params = None
+        p = None
         if params is not None:
-            opti_params = self.model.parameters_vector_from_config(params)
+            p = self.model.parameters_vector_from_config(params)
             self.params = params
 
-        self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj, p=opti_params)
+        if self.pre_processing_fn is not None:
+            x0, self.ref_traj = self.pre_processing_fn(x0, self.ref_traj)
+
+        self.x_pred, self.u_pred = self.solver.solve(x0, self.ref_traj.T, p=p, Q=Q, R=R)
+        self.x_pred = jnp_to_np(self.x_pred)
+        self.u_pred = jnp_to_np(self.u_pred)
 
         self.local_plan = self.ref_traj[:2].T
-        self.control_solution = np.array(self.x_pred[:2, :]).T
+        self.control_solution = np.array(self.x_pred[:2, :])
 
-        return np.array(self.u_pred[:, 0]).flatten()
+        return np.array(self.u_pred[:, 0]).flatten(), {
+            "predicted_state": self.x_pred,
+            "predicted_control": self.u_pred,
+            "steering_angle": self.x_pred[2, 1],
+            "velocity": self.x_pred[3, 1],
+        }

@@ -1,23 +1,41 @@
-import math
 import cvxpy
 import numpy as np
+from scipy.sparse import block_diag, csc_matrix
+
 from f1tenth_planning.control.config.controller_config import mpc_config
 from f1tenth_planning.control.dynamics_model import Dynamics_Model
-from f1tenth_planning.control.discretizers import euler_discretization, system_matrix_discretization
-from scipy.linalg import block_diag
-from scipy.sparse import block_diag, csc_matrix
-from dataclasses import dataclass, field
+from f1tenth_planning.control.discretizers import (
+    euler_discretization,
+    system_matrix_discretization,
+)
+from f1tenth_planning.control.mpc_solver import MPC_Solver
 
-class LTV_MPC_Solver:
+
+class LTV_MPC_Solver(MPC_Solver):
     """
-    Formulates and solves a Linear Time-Varying Model Predictive Control (LTV-MPC) problem for a time-varying or nonlinaer system tracking a reference trajectory.
-    
+    Formulates and solves a Linear Time-Varying Model Predictive Control (LTV-MPC) problem for a time-varying or nonlinear system tracking a reference trajectory. The system dynamics are linearized around the current trajectory at each timestep, and the resulting finite-horizon optimal control problem is solved using CVXPY.
     """
-    def __init__(self, config: mpc_config, model: Dynamics_Model):
+
+    def __init__(
+        self,
+        config: mpc_config,
+        model: Dynamics_Model,
+        discretizer=euler_discretization,
+        dynamics_discretizer=system_matrix_discretization,
+    ):
+        """
+        Initialize the LTV-MPC solver with the given configuration and dynamics model.
+        Args:
+            config (mpc_config): MPC configuration object, contains MPC costs and constraints
+            model (Dynamics_Model): dynamics model object, provides system dynamics and linearization
+            discretizer (function, optional): function to discretize the continuous-time dynamics. Defaults to euler_discretization.
+            dynamics_discretizer (function, optional): function to discretize the linearized system matrices. Defaults to system_matrix_discretization.
+        """
+        super().__init__(config, model)
         self.config = config
         self.model = model
-        self.discretizer = euler_discretization
-        self.dynamics_discretizer = system_matrix_discretization
+        self.discretizer = discretizer
+        self.dynamics_discretizer = dynamics_discretizer
         self.init_problem()
 
     def init_problem(self):
@@ -26,13 +44,15 @@ class LTV_MPC_Solver:
         """
         self.xk = cvxpy.Variable((self.config.nx, self.config.N + 1), name="x[k]")
         self.uk = cvxpy.Variable((self.config.nu, self.config.N), name="u[k]")
-        
-        self.x0 = cvxpy.Parameter(self.config.nx, name="x[0]")
-        self.ref_traj = cvxpy.Parameter((self.config.nx, self.config.N + 1), name="x_ref[k]")
 
-        self.Qk = cvxpy.Parameter((self.config.nx, self.config.nx), name="Q[k]")
-        self.Rk = cvxpy.Parameter((self.config.nu, self.config.nu), name="R[k]")
-        self.Rdk = cvxpy.Parameter((self.config.nu, self.config.nu), name="Rd[k]")
+        self.x0 = cvxpy.Parameter(self.config.nx, name="x[0]")
+        self.ref_traj = cvxpy.Parameter(
+            (self.config.nx, self.config.N + 1), name="x_ref[k]"
+        )
+
+        self.Q = cvxpy.Parameter((self.config.nx, self.config.nx), name="Q[k]")
+        self.R = cvxpy.Parameter((self.config.nu, self.config.nu), name="R[k]")
+        self.Rd = cvxpy.Parameter((self.config.nu, self.config.nu), name="Rd[k]")
         self.P = cvxpy.Parameter((self.config.nx, self.config.nx), name="P")
 
         # Initialize variables
@@ -72,7 +92,9 @@ class LTV_MPC_Solver:
         # Constraints 1: Calculate the future vehicle behavior/states based on the vehicle dynamics model matrices
         path_predict = np.zeros((self.config.nx, self.config.N + 1))
         input_predict = np.zeros((self.config.nu, self.config.N))
-        A_block, B_block, C_block = self.linearize_dynamics_trajectory(path_predict, input_predict)
+        A_block, B_block, C_block = self.linearize_dynamics_trajectory(
+            path_predict, input_predict
+        )
 
         A_block = block_diag(tuple(A_block))
         B_block = block_diag(tuple(B_block))
@@ -129,8 +151,33 @@ class LTV_MPC_Solver:
         # Create the optimization problem in CVXPY and setup the workspace
         # Optimization goal: minimize the objective function
         self.MPC_prob = cvxpy.Problem(cvxpy.Minimize(objective), constraints)
-        
-    def solve(self, x0, xref, Q=None, P=None, R=None, Rd=None)-> tuple[np.ndarray, np.ndarray]:  
+
+    def update(self, x0, ref_traj, p=None, Q=None, R=None, P=None, Rd=None):
+        super().update(x0, ref_traj, p, Q, R, P, Rd)
+        # Set the reference trajectory
+        self.ref_traj.value = ref_traj
+
+        # Set the initial state
+        self.x0.value = x0
+
+        if Q is not None or P is not None or R is not None or Rd is not None:
+            raise ValueError(
+                "Custom cost matrices Q, P, R, Rd are not supported yet in this implementation."
+            )
+
+        # Set the cost matrices
+        if Q is not None:
+            self.Q.value = Q
+        if P is not None:
+            self.P.value = P
+        if R is not None:
+            self.R.value = R
+        if Rd is not None:
+            self.Rd.value = Rd
+
+    def solve(
+        self, x0, xref, Q=None, P=None, R=None, Rd=None
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Solve the LTV-MPC problem for the given initial state and reference trajectory.
 
@@ -147,34 +194,20 @@ class LTV_MPC_Solver:
             np.ndarray: optimal control input of shape (nu, N)
             np.ndarray: optimal state trajectory of shape (nx, N+1)
         """
-        # Set the reference trajectory
-        self.ref_traj.value = xref
+        # Update the parameters of the optimization problem
+        self.update(x0, xref, None, None, p=None, Q=Q, R=R, P=P, Rd=Rd)
 
-        # Set the initial state
-        self.x0.value = x0
-
-        # Set the cost matrices
-        if Q is not None:
-            self.Qk.value = Q
-            self.config.Q = Q
-        if P is not None:
-            self.P.value = P
-            self.config.P = P
-        if R is not None:
-            self.Rk.value = R
-            self.config.R = R
-        if Rd is not None:
-            self.Rd.value = Rd
-            self.config.Rd = Rd
-        
         # Shifted control and state variables for warm start and fallback in case of optimization failure
         last_u = self.uk.value
         last_x = self.xk.value
         shifted_u = np.hstack((last_u[:, 1:], last_u[:, -1].reshape(-1, 1)))
-        pred_x = self.predict_state(x0, last_u)
+        pred_x_N_1 = self.predict_state(x0, last_u[:, -1])
+        pred_x = np.hstack((last_x[:, 1:], pred_x_N_1.reshape(-1, 1)))
 
-        # Linearize the dynamics model along the previoust predicted trajectory
-        A_block, B_block, C_block = self.linearize_dynamics_trajectory(pred_x, shifted_u)
+        # Linearize the dynamics model along the previous predicted trajectory
+        A_block, B_block, C_block = self.linearize_dynamics_trajectory(
+            pred_x, shifted_u
+        )
         A_block = block_diag(tuple(A_block))
         B_block = block_diag(tuple(B_block))
         C_block = np.array(C_block)
@@ -188,19 +221,24 @@ class LTV_MPC_Solver:
 
         # Solve the optimization problem
         self.MPC_prob.solve(solver=cvxpy.OSQP, verbose=False, warm_start=True)
-        
+
         if (
             self.MPC_prob.status == cvxpy.OPTIMAL
             or self.MPC_prob.status == cvxpy.OPTIMAL_INACCURATE
         ):
             return self.xk.value, self.uk.value
         else:
-            print("Optimization problem failed! Returning the last control input shifted by one timestep.")
-            self.uk.value = np.hstack((shifted_u[:, 1:], shifted_u[:, -1].reshape(-1, 1)))
-            last_pred = self.discretizer(self.model.f, pred_x[:, -1], shifted_u[:, -1], self.config.dt)
+            print(
+                "Optimization problem failed! Returning the last control input shifted by one timestep."
+            )
+            self.uk.value = np.hstack(
+                (shifted_u[:, 1:], shifted_u[:, -1].reshape(-1, 1))
+            )
+            last_pred = self.discretizer(
+                self.model.f, pred_x[:, -1], shifted_u[:, -1], self.config.dt
+            )
             self.xk.value = np.hstack((pred_x[:, 1:], last_pred.reshape(-1, 1)))
             return pred_x, shifted_u
-
 
     def predict_state(self, x0, u_traj):
         """
@@ -214,10 +252,12 @@ class LTV_MPC_Solver:
         traj_predict = np.zeros((self.config.nx, self.config.N + 1))
         traj_predict[:, 0] = x0
         for i in range(self.config.N):
-            x = self.discretizer(self.model.f, x, u_traj[:, i], self.model.params, self.config.dt)
+            x = self.discretizer(
+                self.model.f, x, u_traj[:, i], self.model.params, self.config.dt
+            )
             traj_predict[:, i + 1] = x
         return traj_predict
-    
+
     def get_system_matrices(self, x, u):
         """
         Get the discretized, linearized system matrices for the current state and control input.
@@ -235,7 +275,7 @@ class LTV_MPC_Solver:
         Ad, Bd = self.dynamics_discretizer(A, B, self.config.dt)
         Cd = x + self.model.f(x, u) * self.config.dt - Ad @ x - Bd @ u
         return Ad, Bd, Cd
-    
+
     def linearize_dynamics_trajectory(self, x_traj, u_traj):
         """
         Linearize the vehicle dynamics model along the trajectory.
@@ -256,4 +296,3 @@ class LTV_MPC_Solver:
             Bd_traj.append(Bd)
             Cd_traj.extend(Cd)
         return Ad_traj, Bd_traj, Cd_traj
-    

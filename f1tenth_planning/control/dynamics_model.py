@@ -18,7 +18,6 @@ class Dynamics_Model(ABC):
         """
         self.params = params
 
-    @abstractmethod
     def f(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> np.ndarray:
         """
         (Non-)linear dynamics model. This function computes the state derivative given the current state and control input. Should be 
@@ -38,7 +37,6 @@ class Dynamics_Model(ABC):
         """
         raise NotImplementedError("control method not implemented")
 
-    @abstractmethod
     def f_casadi(self, params: dynamics_config = None) -> ca.Function:
         """
         (Non-)linear dynamics model in CasADi symbolic form. This function computes the state derivative given the current state and control 
@@ -57,7 +55,6 @@ class Dynamics_Model(ABC):
         """
         raise NotImplementedError("control method not implemented")
     
-    @abstractmethod
     def f_casadi_opti(self, state: ca.SX, control: ca.SX, params: ca.SX) -> ca.SX:
         """
         Casadi OptiStack compatible function for the dynamic model. 
@@ -71,7 +68,6 @@ class Dynamics_Model(ABC):
         """
         raise NotImplementedError("control method not implemented")
 
-    @abstractmethod
     def f_jax(self, state: jnp.ndarray, control: jnp.ndarray, params: jnp.ndarray = None) -> jnp.ndarray:
         """
         (Non-)linear dynamics model in JAX. This function computes the state derivative given the current state and control input. Should be 
@@ -91,7 +87,6 @@ class Dynamics_Model(ABC):
         """
         raise NotImplementedError("control method not implemented")
     
-    @abstractmethod
     def linearize_around_state(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
         """
         Linearize the dynamics model around a given state and control input. This function computes the state Jacobian and control Jacobian
@@ -111,7 +106,6 @@ class Dynamics_Model(ABC):
         """
         raise NotImplementedError("linearize_around_state method not implemented")
     
-    @abstractmethod
     def parameters_vector_from_config(self, params: dynamics_config) -> np.ndarray:
         """
         Convert the dynamics configuration parameters into a vector format. This function is useful for optimization problems where the
@@ -125,7 +119,6 @@ class Dynamics_Model(ABC):
         """
         raise NotImplementedError("parameters_vector_from_config method not implemented")
     
-    @abstractmethod
     def config_from_parameters_vector(self, params: np.ndarray) -> dynamics_config:
         """
         Convert a vector of parameters into a dynamics configuration object. This function is useful for optimization problems where the

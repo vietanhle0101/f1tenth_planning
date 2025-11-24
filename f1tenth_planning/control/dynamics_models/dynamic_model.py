@@ -211,7 +211,7 @@ class Dynamic_Bicycle_Model(Dynamics_Model):
         dslip_angle_ks = (lr * delta_v) / (
             wheelbase
             * jnp.cos(delta) ** 2
-            * (1 + (jnp.tan(delta)**2 * lr / wheelbase) ** 2)
+            * (1 + (jnp.tan(delta) ** 2 * lr / wheelbase) ** 2)
         )
         ddyaw_ks = (
             1

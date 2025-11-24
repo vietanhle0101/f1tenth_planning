@@ -17,18 +17,21 @@ class mpc_config:
         P (np.ndarray): Terminal cost matrix.
         dt (float): Time discretization interval.
     """
-
+    # Horizon and time step
     N: int
     dt: float
 
+    # Dimensions
     nx: int
     nu: int
 
+    # Cost matrices
     Q: np.ndarray
     R: np.ndarray
     Rd: np.ndarray
     P: np.ndarray
 
+    # Constraints (state and input bounds)
     x_min: np.ndarray = field(default=None)
     x_max: np.ndarray = field(default=None)
     u_min: np.ndarray = field(default=None)
@@ -65,34 +68,10 @@ class mpc_config:
 
 
 @dataclass
-class mppi_config:
+class mppi_config(mpc_config):
     """
-    Configuration for the MPC controller. Includes the following parameters:
-
-    Args:
-        nx (int): Number of states.
-        nu (int): Number of control inputs.
-        N (int): Planning horizon for the MPC controller.
-        Q (np.ndarray): State cost matrix.
-        R (np.ndarray): Control input cost matrix.
-        Rd (np.ndarray): Control input derivative cost matrix (action rate cost).
-        P (np.ndarray): Terminal cost matrix.
-        dt (float): Time discretization interval.
+    Configuration for the MPPI controller, inheriting from mpc_config and adding MPPI-specific parameters.
     """
-
-    nx: int
-    nu: int
-    N: int
-    Q: np.ndarray
-    R: np.ndarray
-    Rd: np.ndarray
-    P: np.ndarray
-    dt: float
-
-    # Control limits
-    u_min: np.ndarray = field(default=None)
-    u_max: np.ndarray = field(default=None)
-
     # MPPI specific parameters
     n_iterations: int = field(default=5)
     n_samples: int = field(default=16)
@@ -103,19 +82,8 @@ class mppi_config:
     adaptive_covariance: bool = field(default=False)
 
     def __post_init__(self):
-        # Default u_min, u_max to infinities if not provided
-        if self.u_min is None:
-            self.u_min = -np.inf * np.ones(self.nu)
-        if self.u_max is None:
-            self.u_max = np.inf * np.ones(self.nu)
-
-        # Check that the dimensions of nx and nu are consistent with Q, Qf, R
-        assert self.Q.shape == (self.nx, self.nx), "Q matrix has incorrect dimensions"
-        assert self.R.shape == (self.nu, self.nu), "R matrix has incorrect dimensions"
-        assert self.P.shape == (self.nx, self.nx), "P matrix has incorrect dimensions"
-        assert self.Rd.shape == (self.nu, self.nu), "Rd matrix has incorrect dimensions"
-        assert self.u_min.shape == (self.nu,), "u_min has incorrect dimensions"
-        assert self.u_max.shape == (self.nu,), "u_max has incorrect dimensions"
+        super().__post_init__()
+        # No additional checks needed for MPPI-specific fields
 
 
 def kinematic_mpc_config():
@@ -152,13 +120,13 @@ def dynamic_mppi_config():
         nx=7,
         nu=2,
         N=10,
-        Q=np.diag([5.0, 5.0, 0.0, 1.0, 0.0, 0.0, 0.0]),
+        Q=np.diag([5.0, 5.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
         R=np.diag([0.0, 0.00]),
         Rd=np.diag([0.0, 0.00]),
-        P=np.diag([25.0, 25.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
+        P=np.diag([5.0, 5.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
         dt=0.1,
-        n_iterations=1,
-        n_samples=512,
+        n_iterations=2,
+        n_samples=1024,
         adaptive_covariance=True,
         scan=False,
     )

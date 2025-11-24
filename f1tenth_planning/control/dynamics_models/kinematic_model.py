@@ -105,7 +105,7 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
         )  # dx/dt = f(x,u)
 
         return RHS
-    
+
     def f_jax(
         self, state: jnp.ndarray, control: jnp.ndarray, params: jnp.ndarray = None
     ) -> np.ndarray:
@@ -137,7 +137,7 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
 
     def parameters_vector_from_config(self, params):
         return np.array([params.WHEELBASE]).reshape(-1, 1)
-    
+
     def config_from_parameters_vector(self, p):
         """
         Convert a parameter vector to a dynamics_config object.
@@ -167,6 +167,7 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
         A = np.zeros((self.nx, self.nx))
 
         A[0, 3] = np.cos(yaw)  # dx/d(v)
+
         A[0, 4] = -v * np.sin(yaw)  # dx/d(yaw)
 
         A[1, 3] = np.sin(yaw)  # dy/d(v)
