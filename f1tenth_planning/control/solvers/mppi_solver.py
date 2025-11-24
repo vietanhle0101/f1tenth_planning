@@ -204,7 +204,7 @@ class MPPI_Solver(MPC_Solver):
             state, ind = x
             u = jnp.reshape(u, (self.config.nu,))
             state = self._step(state, u, p)
-            r = self._reward(state, u, xref[ind + 1, :], Q, R)
+            r = self._reward(state, u, xref[:, ind + 1], Q, R)
             x = (state, ind + 1)
             return x, (x, r)
 

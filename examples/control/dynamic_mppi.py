@@ -23,7 +23,7 @@ def main():
     env: F110Env = gym.make(
         "f1tenth_gym:f1tenth-v0",
         config={
-            "map": "Spielberg_blank",
+            "map": "Spielberg",
             "num_agents": 1,
             "control_input": "accl",
             "observation_config": {"type": "dynamic_state"},
@@ -46,11 +46,9 @@ def main():
     config.N = 20
     params = f1tenth_params()
     # config.Q = np.array([25.0, 25.0, 0.0, 1.0, 0.1, 0.0, 0.0])
-    planner = Nonlinear_Dynamic_MPPI_Planner(track=waypoints_track,
-                                             model=None, 
-                                             solver=None, 
-                                             params=params, 
-                                             config=config)
+    planner = Nonlinear_Dynamic_MPPI_Planner(
+        track=waypoints_track, model=None, solver=None, params=params, config=config
+    )
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
     env.unwrapped.add_render_callback(planner.render_control_solution)
@@ -72,7 +70,7 @@ def main():
     laptime = 0.0
     start = time.time()
     while not done:
-        (steerv, accl), _ = planner.plan(obs["agent_0"])
+        steerv, accl = planner.plan(obs["agent_0"])
         obs, timestep, terminated, truncated, infos = env.step(
             np.array([[steerv, accl]])
         )
