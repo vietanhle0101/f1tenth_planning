@@ -1,5 +1,8 @@
 from dataclasses import dataclass, field
+from typing import Tuple
 import numpy as np
+
+from f1tenth_planning.control.config.model_config import model_config
 
 
 @dataclass
@@ -157,3 +160,53 @@ class lqr_config:
         self.max_iterations = 50
         self.eps = 0.01
         self.dt = 0.01
+
+
+@dataclass
+class lmpc_config:
+    """
+    Configuration for LMPC algorithm-level parameters.
+    """
+
+    N: int = 10
+    dt: float = 0.1
+    n_iterations: int = 1
+    ss_size: int = 5
+    retrain_every_lap: bool = True
+    lap_extend_sec: float = 2.0
+
+
+@dataclass
+class safe_mppi_config:
+    """
+    Configuration for Safe-MPPI solver (sampling, penalty multipliers, etc.).
+    """
+
+    N: int = 10
+    dt: float = 0.1
+    nx: int = 7
+    nu: int = 2
+    n_iterations: int = 2
+    n_samples: int = 512
+    lambs_sample_range: Tuple[float, float] = (-1.0, 5.0)
+    n_lambs: int = 5
+    control_sample_std: np.ndarray = field(
+        default_factory=lambda: np.array([0.5, 0.5])
+    )
+    temperature: float = 0.01
+    damping: float = 0.001
+    adaptive_covariance: bool = True
+    a_cov_shift: bool = False
+    ss_relaxation: float = 0.0
+    obstacle_costfunc_size: float = 0.0
+
+
+@dataclass
+class sit_lmpc_config:
+    """
+    Combined configuration for Safe-MPPI + LMPC (IT-LMPC) controller.
+    """
+
+    lmpc: lmpc_config = field(default_factory=lmpc_config)
+    safe_mppi: safe_mppi_config = field(default_factory=safe_mppi_config)
+    model: model_config = field(default_factory=model_config)
