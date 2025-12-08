@@ -20,16 +20,16 @@ readme = "README.md"
 homepage = "https://f1tenth.org"
 repository = "https://github.com/f1tenth/f1tenth_planning"
 documentation = "https://f1tenth-gym.readthedocs.io/en/latest/"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "casadi>=3.7.2",
     "cvxpy>=1.7.5",
     "f1tenth-gym",
-    "jax[cuda12]>=0.8.1",
+    "jax[cuda12]<=0.6.2",
     "kiwisolver>=1.4.9",
     "llvmlite>=0.45.1",
     "numba>=0.62.1",
-    "numpy>=2.3.5",
+    "numpy>=2.2.6",
     "osqp>=1.0.5",
     "pyyaml>=6.0.3",
     "qdldl>=0.1.7.post5",
