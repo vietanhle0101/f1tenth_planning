@@ -1,39 +1,44 @@
-[tool.poetry]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
 name = "f1tenth-planning"
 version = "0.1.1"
 description = "F1TENTH Motion Planning Library"
 license = "MIT"
 authors = [
-    "Hongrui Zheng",
-    "Renukanandan Tumu",
-    "Luigi Berducci",
-    "Ahmad Amine",
+    { name = "Hongrui Zheng" },
+    { name = "Renukanandan Tumu" },
+    { name = "Luigi Berducci" },
+    { name = "Ahmad Amine" },
 ]
 maintainers = [
-    "Hongrui Zheng",
+    { name = "Hongrui Zheng" },
 ]
 readme = "README.md"
 homepage = "https://f1tenth.org"
 repository = "https://github.com/f1tenth/f1tenth_planning"
 documentation = "https://f1tenth-gym.readthedocs.io/en/latest/"
-packages = [
-    { include = "f1tenth_planning", from = "." },
+requires-python = ">=3.11"
+dependencies = [
+    "casadi>=3.7.2",
+    "cvxpy>=1.7.5",
+    "f1tenth-gym",
+    "jax[cuda12]>=0.8.1",
+    "kiwisolver>=1.4.9",
+    "llvmlite>=0.45.1",
+    "numba>=0.62.1",
+    "numpy>=2.3.5",
+    "osqp>=1.0.5",
+    "pyyaml>=6.0.3",
+    "qdldl>=0.1.7.post5",
+    "scs>=3.2.9",
 ]
 
-[tool.poetry.dependencies]
-python = "^3.9 <3.12"
-cvxpy = "*"
-osqp = "*"
-kiwisolver = "*"
-scs = "*"
-llvmlite = "*"
-numba = "*"
-numpy = "*"
-qdldl = "*"
-pyyaml = "*"
-f1tenth_gym = {git = "git@github.com:f1tenth/f1tenth_gym", branch = "dev-dynamics"}
+[tool.hatch.build.targets.wheel]
+packages = ["f1tenth_planning"]
 
+[tool.uv.sources]
+f1tenth-gym = { git = "https://github.com/f1tenth/f1tenth_gym", branch = "dev-dynamics" }
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
