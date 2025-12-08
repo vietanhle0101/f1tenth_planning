@@ -146,7 +146,10 @@ class MPPI_Solver(MPC_Solver):
         """
         Single-step state prediction function.
         """
-        return self.discretizer(self.model.f_jax, x, u, p, self.config.dt)
+        next_x = self.discretizer(self.model.f_jax, x, u, p, self.config.dt)
+        # Clip the next state to the bounds
+        next_x = jnp.clip(next_x, self.config.x_min, self.config.x_max)
+        return next_x
 
     def _reward(self, x, u, x_ref, Q, R):
         """
