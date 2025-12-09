@@ -31,27 +31,17 @@ def main():
         },
         render_mode="human",
     )
-
-    # Load track waypoints
-    waypoints_track: Track = Track.from_raceline_file(
-        os.path.join(os.path.dirname(__file__), "trajectory_log.csv"),
-        delimiter=";",
-        skip_rows=3,
-    )
     waypoints_track = env.unwrapped.track
 
     # create planner
-    config = dynamic_mppi_config()
-    config.dt = 0.05  # 60 Hz
-    config.N = 20
-    params = f1tenth_params()
-    # config.Q = np.array([25.0, 25.0, 0.0, 1.0, 0.1, 0.0, 0.0])
     planner = Nonlinear_Dynamic_MPPI_Planner(
-        track=waypoints_track, model=None, solver=None, params=params, config=config
+        track=waypoints_track,
     )
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
     env.unwrapped.add_render_callback(planner.render_control_solution)
+    # Only render sampled trajectories for debugging, otherwise it's too slow
+    # env.unwrapped.add_render_callback(planner.render_sampled_trajectories)
 
     # reset environment
     poses = np.array(

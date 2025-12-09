@@ -20,6 +20,7 @@ class mpc_config:
         P (np.ndarray): Terminal cost matrix.
         dt (float): Time discretization interval.
     """
+
     # Horizon and time step
     N: int
     dt: float
@@ -75,6 +76,7 @@ class mppi_config(mpc_config):
     """
     Configuration for the MPPI controller, inheriting from mpc_config and adding MPPI-specific parameters.
     """
+
     # MPPI specific parameters
     n_iterations: int = field(default=5)
     n_samples: int = field(default=16)
@@ -122,12 +124,12 @@ def dynamic_mppi_config():
     return mppi_config(
         nx=7,
         nu=2,
-        N=10,
+        N=20,
         Q=np.diag([5.0, 5.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
         R=np.diag([0.0, 0.00]),
         Rd=np.diag([0.0, 0.00]),
         P=np.diag([5.0, 5.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
-        dt=0.1,
+        dt=0.05,
         n_iterations=2,
         n_samples=1024,
         adaptive_covariance=True,
