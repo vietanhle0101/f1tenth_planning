@@ -41,13 +41,8 @@ def main():
     waypoints_track = env.unwrapped.track
 
     # create planner
-    config = dynamic_mppi_config()
-    config.dt = 0.05  # 60 Hz
-    config.N = 20
-    params = f1tenth_params()
-    # config.Q = np.array([25.0, 25.0, 0.0, 1.0, 0.1, 0.0, 0.0])
     planner = Nonlinear_Dynamic_MPPI_Planner(
-        track=waypoints_track, model=None, solver=None, params=params, config=config
+        track=waypoints_track,
     )
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
