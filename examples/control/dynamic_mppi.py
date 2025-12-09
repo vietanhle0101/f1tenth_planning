@@ -31,13 +31,6 @@ def main():
         },
         render_mode="human",
     )
-
-    # Load track waypoints
-    waypoints_track: Track = Track.from_raceline_file(
-        os.path.join(os.path.dirname(__file__), "trajectory_log.csv"),
-        delimiter=";",
-        skip_rows=3,
-    )
     waypoints_track = env.unwrapped.track
 
     # create planner
@@ -47,6 +40,8 @@ def main():
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
     env.unwrapped.add_render_callback(planner.render_control_solution)
+    # Only render sampled trajectories for debugging, otherwise it's too slow
+    # env.unwrapped.add_render_callback(planner.render_sampled_trajectories)
 
     # reset environment
     poses = np.array(
