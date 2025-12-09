@@ -11,6 +11,7 @@ from f1tenth_planning.control.config.controller_config import (
 )
 from f1tenth_planning.control.dynamics_model import Dynamics_Model
 from f1tenth_planning.control.solvers import MPPI_Solver
+import jax.numpy as jnp
 
 
 class Dynamic_MPPI_Planner(MPC_Controller):
@@ -45,6 +46,42 @@ class Dynamic_MPPI_Planner(MPC_Controller):
             model = Dynamic_Bicycle_Model(params)
         if config is None:
             config = dynamic_mppi_config()
+            # x = [x, y, delta, v, yaw, yaw_rate, beta]
+            config.x_min = jnp.array(
+                [
+                    -jnp.inf,
+                    -jnp.inf,
+                    params.MIN_STEER,
+                    params.MIN_SPEED,
+                    -jnp.inf,
+                    -jnp.inf,
+                    -jnp.inf,
+                ]
+            )
+            config.x_max = jnp.array(
+                [
+                    jnp.inf,
+                    jnp.inf,
+                    params.MAX_STEER,
+                    params.MAX_SPEED,
+                    jnp.inf,
+                    jnp.inf,
+                    jnp.inf,
+                ]
+            )
+            # u = [delta_v, a]
+            config.u_min = jnp.array(
+                [
+                    params.MIN_DSTEER,
+                    params.MIN_ACCEL,
+                ]
+            )
+            config.u_max = jnp.array(
+                [
+                    params.MAX_DSTEER,
+                    params.MAX_ACCEL,
+                ]
+            )
         if solver is None:
             solver = MPPI_Solver(config, model)
         super(Dynamic_MPPI_Planner, self).__init__(

@@ -13,6 +13,7 @@ from f1tenth_planning.control.config.dynamics_config import (
     f1tenth_params,
 )
 from f1tenth_gym.envs.track import Track
+import numpy as np
 
 
 class Nonlinear_Kinematic_MPC_Planner(MPC_Controller):
@@ -44,6 +45,38 @@ class Nonlinear_Kinematic_MPC_Planner(MPC_Controller):
             solver = Nonlinear_MPC_Solver(config=config, model=model)
         if pre_processing_fn is None:
             pre_processing_fn = _extract_kinematic_state
+            # x = [x, y, delta, v, yaw]
+            config.x_min = np.array(
+                [
+                    -np.inf,
+                    -np.inf,
+                    params.MIN_STEER,
+                    params.MIN_SPEED,
+                    -np.inf,
+                ]
+            )
+            config.x_max = np.array(
+                [
+                    np.inf,
+                    np.inf,
+                    params.MAX_STEER,
+                    params.MAX_SPEED,
+                    np.inf,
+                ]
+            )
+            # u = [delta_v, a]
+            config.u_min = np.array(
+                [
+                    params.MIN_DSTEER,
+                    params.MIN_ACCEL,
+                ]
+            )
+            config.u_max = np.array(
+                [
+                    params.MAX_DSTEER,
+                    params.MAX_ACCEL,
+                ]
+            )
         super(Nonlinear_Kinematic_MPC_Planner, self).__init__(
             track,
             solver,
