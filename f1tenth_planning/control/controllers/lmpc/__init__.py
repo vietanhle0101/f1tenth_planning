@@ -4,30 +4,30 @@ from f1tenth_planning.control.controllers.lmpc.components import (
     SimpleValueFunctionModel,
 )
 from f1tenth_planning.control.controllers.lmpc.manager import LMPCIterationManager
-from f1tenth_planning.control.solvers import SafeMPPISolver
+from f1tenth_planning.control.solvers import APMPPISolver
 from f1tenth_planning.control.config.controller_config import (
-    lmpc_config,
-    safe_mppi_config,
+    LMPCConfig,
+    APMPPIConfig,
 )
 from f1tenth_planning.control.config.dynamics_config import f1tenth_params
 
 
 class SITLMPCPlanner(LMPCController):
     """
-    Convenience planner wiring LMPCController with the Safe-MPPI stub components.
+    Convenience planner wiring LMPCController with the AP-MPPI stub components.
     """
 
     def __init__(
         self,
         track,
         params=None,
-        lmpc_cfg: lmpc_config = None,
-        safe_mppi_cfg: safe_mppi_config = None,
+        lmpc_cfg: LMPCConfig = None,
+        ap_mppi_cfg: APMPPIConfig = None,
         base_controller=None,
     ):
-        lmpc_cfg = lmpc_cfg or lmpc_config()
-        safe_mppi_cfg = safe_mppi_cfg or safe_mppi_config()
-        solver = SafeMPPISolver(safe_mppi_cfg)
+        lmpc_cfg = lmpc_cfg or LMPCConfig()
+        ap_mppi_cfg = ap_mppi_cfg or APMPPIConfig()
+        solver = APMPPISolver(ap_mppi_cfg)
         params = params or (
             track.vehicle_params
             if hasattr(track, "vehicle_params")

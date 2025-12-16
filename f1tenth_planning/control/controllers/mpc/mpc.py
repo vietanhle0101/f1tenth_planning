@@ -3,16 +3,16 @@ from f1tenth_gym.envs.track import Track
 from f1tenth_planning.utils.utils import calc_interpolated_reference_trajectory
 from f1tenth_planning.control.controller import Controller
 from f1tenth_planning.control.config.dynamics_config import (
-    dynamics_config,
+    DynamicsConfig,
     f1tenth_params,
 )
-from f1tenth_planning.control.mpc_solver import MPC_Solver
-from f1tenth_planning.control.dynamics_model import Dynamics_Model
+from f1tenth_planning.control.mpc_solver import MPCSolver
+from f1tenth_planning.control.dynamics_model import DynamicsModel
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 from f1tenth_planning.utils.utils import jnp_to_np
 
 
-class MPC_Controller(Controller):
+class MPCController(Controller):
     """
     MPPI Controller, uses CasADi to solve the nonlinear MPC problem using whatever model is passed in.
 
@@ -20,9 +20,9 @@ class MPC_Controller(Controller):
 
     Args:
         track (f1tenth_gym_ros:Track): track object, contains the reference raceline
-        solver (MPC_Solver): MPC solver object, contains MPC parameters
-        model (Dynamics_Model): dynamics model object, contains the vehicle dynamics
-        params (dynamics_config, optional): Vehicle parameters for the model. If none,
+        solver (MPCSolver): MPC solver object, contains MPC parameters
+        model (DynamicsModel): dynamics model object, contains the vehicle dynamics
+        params (DynamicsConfig, optional): Vehicle parameters for the model. If none,
             default f1tenth_params() will be used.
         pre_processing_fn (function, optional): Function to preprocess the state and reference trajectory before calling the solver.
             Should take in (x0, xref) and return processed (x0, xref). If none, no preprocessing is done.
@@ -31,9 +31,9 @@ class MPC_Controller(Controller):
     def __init__(
         self,
         track: Track,
-        solver: MPC_Solver,
-        model: Dynamics_Model,
-        params: dynamics_config = f1tenth_params(),
+        solver: MPCSolver,
+        model: DynamicsModel,
+        params: DynamicsConfig = f1tenth_params(),
         pre_processing_fn=None,
     ):
         super().__init__(
@@ -101,7 +101,7 @@ class MPC_Controller(Controller):
         self,
         state: dict,
         waypoints=None,
-        params: dynamics_config = None,
+        params: DynamicsConfig = None,
         Q: np.ndarray = None,
         R: np.ndarray = None,
     ):
@@ -112,7 +112,7 @@ class MPC_Controller(Controller):
             state (dict): Dictionary containing the vehicle's state.
             waypoints (numpy.ndarray [N x 5], optional): An array of dynamic waypoints, where each waypoint has
             the format [x, y, delta, velocity, heading]. Overrides the static raceline if provided.
-            params (dynamics_config, optional): Vehicle parameters for the dynamic model. If none, uses default.
+            params (DynamicsConfig, optional): Vehicle parameters for the dynamic model. If none, uses default.
             Q (np.ndarray, optional): State cost matrix. If none, uses default.
             R (np.ndarray, optional): Control input cost matrix. If none, uses default.
 

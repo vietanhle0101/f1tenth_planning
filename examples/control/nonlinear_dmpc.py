@@ -3,7 +3,7 @@ import gymnasium as gym
 from f1tenth_gym.envs import F110Env
 import time
 
-from f1tenth_planning.control import Nonlinear_Dynamic_MPC_Planner
+from f1tenth_planning.control import NonlinearDynamicMPCPlanner
 from f1tenth_planning.control.config.dynamics_config import (
     f1tenth_params,
 )
@@ -28,7 +28,7 @@ def main():
         render_mode="human",
     )
     # create planner
-    planner = Nonlinear_Dynamic_MPC_Planner(
+    planner = NonlinearDynamicMPCPlanner(
         track=env.unwrapped.track, params=f1tenth_params()
     )
     env.unwrapped.add_render_callback(planner.render_waypoints)

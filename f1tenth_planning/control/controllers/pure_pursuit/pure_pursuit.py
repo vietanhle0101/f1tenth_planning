@@ -12,7 +12,7 @@ from f1tenth_planning.utils.utils import get_actuation
 from f1tenth_planning.control.controller import Controller
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 from f1tenth_planning.control.config.dynamics_config import (
-    dynamics_config,
+    DynamicsConfig,
     f1tenth_params,
 )
 
@@ -30,7 +30,7 @@ class PurePursuitPlanner(Controller):
 
     Args:
         track (Track): Track instance containing the raceline information.
-        params (dynamics_config, optional): Vehicle dynamic parameters. Defaults to dynamics_config().
+        params (DynamicsConfig, optional): Vehicle dynamic parameters. Defaults to DynamicsConfig().
         max_reacquire (float, optional): Maximum radius (in meters) to reacquire the current waypoint in case the vehicle drifts. Defaults to 20.0.
         lookahead_distance (float, optional): Default lookahead distance (in meters) to use if not provided during planning. Defaults to 0.8.
 
@@ -43,7 +43,7 @@ class PurePursuitPlanner(Controller):
     def __init__(
         self,
         track: Track,
-        params: dynamics_config = f1tenth_params(),
+        params: DynamicsConfig = f1tenth_params(),
         lookahead_distance=0.8,
         max_reacquire=20.0,
     ):

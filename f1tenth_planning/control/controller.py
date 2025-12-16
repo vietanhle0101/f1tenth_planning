@@ -3,12 +3,12 @@ from abc import abstractmethod, ABC
 
 import numpy as np
 from f1tenth_gym.envs.track import Track
-from f1tenth_planning.control.config.dynamics_config import dynamics_config
+from f1tenth_planning.control.config.dynamics_config import DynamicsConfig
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 
 class Controller(ABC):
     @abstractmethod
-    def __init__(self, track: Track, params: dynamics_config, control_mode : tuple[SteerActionEnum, LongitudinalActionEnum]) -> None:
+    def __init__(self, track: Track, params: DynamicsConfig, control_mode : tuple[SteerActionEnum, LongitudinalActionEnum]) -> None:
         """
         Initialize controller.
 

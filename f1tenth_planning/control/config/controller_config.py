@@ -2,11 +2,11 @@ from dataclasses import dataclass, field
 from typing import Tuple
 import numpy as np
 
-from f1tenth_planning.control.config.model_config import model_config
+from f1tenth_planning.control.config.model_config import ModelConfig
 
 
 @dataclass
-class mpc_config:
+class MPCConfig:
     """
     Configuration for the MPC controller. Includes the following parameters:
 
@@ -71,9 +71,9 @@ class mpc_config:
 
 
 @dataclass
-class mppi_config(mpc_config):
+class MPPIConfig(MPCConfig):
     """
-    Configuration for the MPPI controller, inheriting from mpc_config and adding MPPI-specific parameters.
+    Configuration for the MPPI controller, inheriting from MPCConfig and adding MPPI-specific parameters.
     """
     # MPPI specific parameters
     n_iterations: int = field(default=5)
@@ -91,7 +91,7 @@ class mppi_config(mpc_config):
 
 def kinematic_mpc_config():
     # [x, y, delta, v, yaw]
-    return mpc_config(
+    return MPCConfig(
         nx=5,
         nu=2,
         N=15,
@@ -105,7 +105,7 @@ def kinematic_mpc_config():
 
 def dynamic_mpc_config():
     # [x, y, delta, v, yaw, yaw_rate, beta]
-    return mpc_config(
+    return MPCConfig(
         nx=7,
         nu=2,
         N=15,
@@ -119,7 +119,7 @@ def dynamic_mpc_config():
 
 def dynamic_mppi_config():
     # [x, y, delta, v, yaw, yaw_rate, beta]
-    return mppi_config(
+    return MPPIConfig(
         nx=7,
         nu=2,
         N=10,
@@ -136,7 +136,7 @@ def dynamic_mppi_config():
 
 
 @dataclass
-class lqr_config:
+class LQRConfig:
     """
     Configuration for the LQR controller. Includes the following parameters:
 
@@ -163,7 +163,7 @@ class lqr_config:
 
 
 @dataclass
-class lmpc_config:
+class LMPCConfig:
     """
     Configuration for LMPC algorithm-level parameters.
     """
@@ -177,9 +177,9 @@ class lmpc_config:
 
 
 @dataclass
-class safe_mppi_config:
+class APMPPIConfig:
     """
-    Configuration for Safe-MPPI solver (sampling, penalty multipliers, etc.).
+    Configuration for AP-MPPI solver (sampling, penalty multipliers, etc.).
     """
 
     N: int = 10
@@ -202,11 +202,11 @@ class safe_mppi_config:
 
 
 @dataclass
-class sit_lmpc_config:
+class SITLMPCConfig:
     """
     Combined configuration for Safe-MPPI + LMPC (IT-LMPC) controller.
     """
 
-    lmpc: lmpc_config = field(default_factory=lmpc_config)
-    safe_mppi: safe_mppi_config = field(default_factory=safe_mppi_config)
-    model: model_config = field(default_factory=model_config)
+    lmpc: LMPCConfig = field(default_factory=LMPCConfig)
+    ap_mppi: APMPPIConfig = field(default_factory=APMPPIConfig)
+    model: ModelConfig = field(default_factory=ModelConfig)

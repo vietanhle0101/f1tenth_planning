@@ -4,10 +4,10 @@ import jax.numpy as jnp
 from pathlib import Path
 from functools import partial
 
-from f1tenth_planning.control.config.controller_config import mppi_config
+from f1tenth_planning.control.config.controller_config import MPPIConfig
 from f1tenth_planning.control.discretizers import rk4_discretization
-from f1tenth_planning.control.dynamics_model import Dynamics_Model
-from f1tenth_planning.control.mpc_solver import MPC_Solver
+from f1tenth_planning.control.dynamics_model import DynamicsModel
+from f1tenth_planning.control.mpc_solver import MPCSolver
 
 jax_cache_dir = Path.home() / "jax_cache"
 jax_cache_dir.mkdir(exist_ok=True)
@@ -48,20 +48,20 @@ def truncated_gaussian_sampler(key, mean, low, high, cov):
     return mean + R @ samples
 
 
-class MPPI_Solver(MPC_Solver):
+class MPPISolver(MPCSolver):
     """
     Path-tracking Model Predictive Path Integral (MPPI) controller.
     paper: https://arxiv.org/pdf/1707.02342 | base code: https://github.com/google-research/google-research/tree/master/jax_mpc
 
     Args:
-        config (mppi_config): MPPI configuration object, contains MPPI costs and constraints
-        model (Dynamics_Model): dynamics model object, used to compute the state derivative
+        config (MPPIConfig): MPPI configuration object, contains MPPI costs and constraints
+        model (DynamicsModel): dynamics model object, used to compute the state derivative
     """
 
     def __init__(
         self,
-        config: mppi_config,
-        model: Dynamics_Model,
+        config: MPPIConfig,
+        model: DynamicsModel,
         discretizer=rk4_discretization,
         step_function=None,
         reward_function=None,
@@ -69,8 +69,8 @@ class MPPI_Solver(MPC_Solver):
         """
         Initialize the MPPI solver.
         Args:
-            config (mppi_config): MPPI configuration object, contains MPPI costs and constraints
-            model (Dynamics_Model): dynamics model object, used to compute the state derivative
+            config (MPPIConfig): MPPI configuration object, contains MPPI costs and constraints
+            model (DynamicsModel): dynamics model object, used to compute the state derivative
             discretizer (function, optional): function to discretize the continuous-time dynamics. Defaults to rk4_discretization.
             step_function (function, optional): function of the form _step(self, x, u, p) to compute the next state given current state and control input. If None, uses the discretizer with model's f_jax
             reward_function (function, optional): function of the form _reward(self, x, u, x_ref, Q, R) to compute the reward given current state, control input, reference state, Q, and R. If None, uses the default quadratic cost
@@ -78,7 +78,7 @@ class MPPI_Solver(MPC_Solver):
             None
         """
         super().__init__(config, model)
-        self.config: mppi_config = self.config  # For type hinting
+        self.config: MPPIConfig = self.config  # For type hinting
         self.discretizer = discretizer
         if step_function is not None:
             self._step = step_function

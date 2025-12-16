@@ -8,10 +8,10 @@ from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
 
 from f1tenth_planning.control.controller import Controller
 from f1tenth_planning.control.config.dynamics_config import (
-    dynamics_config,
+    DynamicsConfig,
     f1tenth_params,
 )
-from f1tenth_planning.control.config.controller_config import lmpc_config
+from f1tenth_planning.control.config.controller_config import LMPCConfig
 from f1tenth_planning.control.controllers.lmpc.components import (
     LMPCSolver,
     SafeSetStore,
@@ -35,8 +35,8 @@ class LMPCController(Controller):
         value_function: Optional[ValueFunctionModel] = None,
         iteration_manager: Optional[LMPCIterationManager] = None,
         base_controller: Optional[Controller] = None,
-        params: dynamics_config = f1tenth_params(),
-        lmpc_cfg: Optional[lmpc_config] = None,
+        params: DynamicsConfig = f1tenth_params(),
+        lmpc_cfg: Optional[LMPCConfig] = None,
     ):
         super().__init__(
             track,
@@ -58,7 +58,7 @@ class LMPCController(Controller):
         self.solver = solver
         self.safe_set_store = safe_set_store or SimpleSafeSetStore()
         self.value_function = value_function or SimpleValueFunctionModel()
-        self.lmpc_cfg = lmpc_cfg or lmpc_config()
+        self.lmpc_cfg = lmpc_cfg or LMPCConfig()
         self.base_controller = base_controller
         self.iteration_manager = iteration_manager or LMPCIterationManager(
             self.safe_set_store, self.value_function, self.lmpc_cfg

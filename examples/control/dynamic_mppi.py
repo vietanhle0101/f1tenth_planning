@@ -6,7 +6,7 @@ import numpy as np
 
 from f1tenth_gym.envs import F110Env
 from f1tenth_gym.envs.track import Track
-from f1tenth_planning.control import Nonlinear_Dynamic_MPPI_Planner
+from f1tenth_planning.control import NonlinearDynamicMPPIPlanner
 from f1tenth_planning.control.config.controller_config import dynamic_mppi_config
 from f1tenth_planning.control.config.dynamics_config import (
     f1tenth_params,
@@ -46,7 +46,7 @@ def main():
     config.N = 20
     params = f1tenth_params()
     # config.Q = np.array([25.0, 25.0, 0.0, 1.0, 0.1, 0.0, 0.0])
-    planner = Nonlinear_Dynamic_MPPI_Planner(
+    planner = NonlinearDynamicMPPIPlanner(
         track=waypoints_track, model=None, solver=None, params=params, config=config
     )
     env.unwrapped.add_render_callback(planner.render_waypoints)

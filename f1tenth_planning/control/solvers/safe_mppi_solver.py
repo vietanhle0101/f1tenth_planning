@@ -15,11 +15,11 @@ from f1tenth_planning.control.controllers.lmpc.components import (
     LMPCSolver,
     ValueFunctionModel,
 )
-from f1tenth_planning.control.config.controller_config import safe_mppi_config
+from f1tenth_planning.control.config.controller_config import APMPPIConfig
 
 
-class SafeMPPISolver(LMPCSolver):
-    def __init__(self, config: safe_mppi_config):
+class APMPPISolver(LMPCSolver):
+    def __init__(self, config: APMPPIConfig):
         self.config = config
 
     def solve(

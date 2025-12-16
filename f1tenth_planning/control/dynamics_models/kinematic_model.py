@@ -1,5 +1,5 @@
-from f1tenth_planning.control.dynamics_model import Dynamics_Model
-from f1tenth_planning.control.config.dynamics_config import dynamics_config
+from f1tenth_planning.control.dynamics_model import DynamicsModel
+from f1tenth_planning.control.config.dynamics_config import DynamicsConfig
 
 import jax.numpy as jnp
 import numpy as np
@@ -13,7 +13,7 @@ def _extract_kinematic_state(x0, xref):
     return x0[:5], xref[:5, :]
 
 
-class Kinematic_Bicycle_Model(Dynamics_Model):
+class KinematicBicycleModel(DynamicsModel):
     """
     Kinematic bicycle model for vehicle dynamics.
 
@@ -26,16 +26,16 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
         https://gitlab.lrz.de/tum-cps/commonroad-vehicle-models/-/blob/master/vehicleModels_commonRoad.pdf?ref_type=heads
 
     Args:
-        dynamics_config: dynamics_config - vehicle dynamics configuration
+        DynamicsConfig: DynamicsConfig - vehicle dynamics configuration
     """
 
-    def __init__(self, params: dynamics_config):
+    def __init__(self, params: DynamicsConfig):
         super().__init__(params)
         self.nx = 5
         self.nu = 2
 
     def f(
-        self, state: dict, control: np.ndarray, params: dynamics_config = None
+        self, state: dict, control: np.ndarray, params: DynamicsConfig = None
     ) -> np.ndarray:
         """
         Compute the state derivative given the current state and control input.
@@ -43,7 +43,7 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
         Args:
             state (np.ndarray): dynamic state as [x, y, delta, v, yaw]
             control (np.ndarray): control input as (steering_velocity, acceleration)
-            params (dynamics_config): vehicle dynamics parameters
+            params (DynamicsConfig): vehicle dynamics parameters
 
         Returns:
             np.ndarray: state derivative
@@ -122,7 +122,7 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
         Args:
             state (np.ndarray): dynamic state as [x, y, delta, v, yaw]
             control (np.ndarray): control input as (steering_velocity, acceleration)
-            params (dynamics_config): vehicle dynamics parameters
+            params (DynamicsConfig): vehicle dynamics parameters
 
         Returns:
             np.ndarray: state derivative
@@ -155,7 +155,7 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
         Returns:
             dynamics_config: vehicle dynamics configuration
         """
-        return dynamics_config(WHEELBASE=p[0])
+        return DynamicsConfig(WHEELBASE=p[0])
 
     @property
     def num_params(self) -> int:
@@ -166,7 +166,7 @@ class Kinematic_Bicycle_Model(Dynamics_Model):
         return len(active_params)
 
     def linearize_around_state(
-        self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None
+        self, state: np.ndarray, control: np.ndarray, params: DynamicsConfig = None
     ) -> tuple[np.ndarray, np.ndarray]:
         x, y, delta, v, yaw = state
 

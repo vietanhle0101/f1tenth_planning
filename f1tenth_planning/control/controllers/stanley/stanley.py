@@ -29,7 +29,7 @@ Last Modified: 5/1/22
 
 from f1tenth_gym.envs.track import Track
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
-from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1tenth_params
+from f1tenth_planning.control.config.dynamics_config import DynamicsConfig, f1tenth_params
 from f1tenth_planning.control.controller import Controller
 from f1tenth_planning.utils.utils import nearest_point
 from f1tenth_planning.utils.utils import pi_2_pi
@@ -54,7 +54,7 @@ class StanleyController(Controller):
 
     Args:
         track (Track): Racetrack instance containing raceline and waypoint information.
-        params (dynamics_config, optional): Vehicle dynamics configuration parameters (default: f1tenth_params()).
+        params (DynamicsConfig, optional): Vehicle dynamics configuration parameters (default: f1tenth_params()).
 
     Attributes:
         waypoints (numpy.ndarray [N x 4]): Static list of waypoints to track; columns correspond to [x, y, velocity, heading].
@@ -63,7 +63,7 @@ class StanleyController(Controller):
         target_index (int or None): Index of the current waypoint.
     """
 
-    def __init__(self, track: Track, params: dynamics_config = f1tenth_params(), k_path=5.0):
+    def __init__(self, track: Track, params: DynamicsConfig = f1tenth_params(), k_path=5.0):
         super(StanleyController, self).__init__(track, params, 
                                                  control_mode=(SteerActionEnum.Steering_Angle, LongitudinalActionEnum.Speed))
         self.waypoints = np.vstack([

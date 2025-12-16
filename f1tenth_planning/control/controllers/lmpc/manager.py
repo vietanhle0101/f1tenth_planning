@@ -13,7 +13,7 @@ from f1tenth_planning.control.controllers.lmpc.components import (
     ValueFunctionModel,
     EpisodeLogger,
 )
-from f1tenth_planning.control.config.controller_config import lmpc_config
+from f1tenth_planning.control.config.controller_config import LMPCConfig
 
 
 class LMPCIterationManager:
@@ -21,7 +21,7 @@ class LMPCIterationManager:
         self,
         safe_set_store: SafeSetStore,
         value_function: Optional[ValueFunctionModel],
-        config: lmpc_config,
+        config: LMPCConfig,
         logger: Optional[EpisodeLogger] = None,
     ):
         self.safe_set_store = safe_set_store
