@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Tuple
+from typing import Callable, List
 import numpy as np
 
 from f1tenth_planning.control.config.model_config import ModelConfig
@@ -74,6 +74,15 @@ class MPCConfig:
 class MPPIConfig(MPCConfig):
     """
     Configuration for the MPPI controller, inheriting from MPCConfig and adding MPPI-specific parameters.
+
+    Args:
+        n_iterations (int): Number of iterations for the MPPI solver.
+        n_samples (int): Number of samples for the MPPI solver.
+        temperature (float): Temperature for the MPPI solver.
+        damping (float): Damping for the MPPI solver.
+        u_std (float): Standard deviation of the control noise.
+        scan (bool): Whether to scan the control space.
+        adaptive_covariance (bool): Whether to adapt the covariance matrix.
     """
     # MPPI specific parameters
     n_iterations: int = field(default=5)
@@ -177,28 +186,23 @@ class LMPCConfig:
 
 
 @dataclass
-class APMPPIConfig:
+class APMPPIConfig(MPPIConfig):
     """
     Configuration for AP-MPPI solver (sampling, penalty multipliers, etc.).
-    """
 
-    N: int = 10
-    dt: float = 0.1
-    nx: int = 7
-    nu: int = 2
-    n_iterations: int = 2
-    n_samples: int = 512
-    lambs_sample_range: Tuple[float, float] = (-1.0, 5.0)
-    n_lambs: int = 5
-    control_sample_std: np.ndarray = field(
-        default_factory=lambda: np.array([0.5, 0.5])
-    )
-    temperature: float = 0.01
-    damping: float = 0.001
-    adaptive_covariance: bool = True
-    a_cov_shift: bool = False
-    ss_relaxation: float = 0.0
-    obstacle_costfunc_size: float = 0.0
+    Args:
+        n_lambdas (np.ndarray): Number of lambda penalty multipliers to sample in total.
+        lambdas_sample_range (np.ndarray): Range of the lambda penalty multipliers of size (n_constraints, 2).
+        constraints (List[Callable]): List of constraint functions.
+    """
+    n_lambdas: np.ndarray = field(default=np.array([5]))
+    lambdas_sample_range: np.ndarray = field(default=np.array([-1.0, 5.0]))
+    constraints: List[Callable] = field(default=[])
+    n_constraints: int = field(default=0)
+
+    def __post_init__(self):
+        self.n_constraints = len(self.constraints)
+        assert self.lambdas_sample_range.shape == (self.n_constraints, 2), "lambdas_sample_range has incorrect dimensions"
 
 
 @dataclass
