@@ -3,19 +3,19 @@ from __future__ import annotations
 import numpy as np
 import casadi as ca
 
-from f1tenth_planning.control.config.dynamics_config import dynamics_config
+from f1tenth_planning.control.config.dynamics_config import DynamicsConfig
 from f1tenth_planning.estimation.estimators.parameter_estimators.paramter_estimator import (
     ParameterEstimator,
 )
-from f1tenth_planning.control.dynamics_model import Dynamics_Model
+from f1tenth_planning.control.dynamics_model import DynamicsModel
 from f1tenth_planning.control.discretizers import rk4_discretization
 
 
 class NLSParameterEstimator(ParameterEstimator):
     def __init__(
         self,
-        initial_params: dynamics_config,
-        model: Dynamics_Model,
+        initial_params: DynamicsConfig,
+        model: DynamicsModel,
         estimation_history_length: int,
         dt: float = 0.1,
     ):
@@ -33,7 +33,7 @@ class NLSParameterEstimator(ParameterEstimator):
         )
 
     def __initialize_nls_problem(
-        self, initial_params: dynamics_config, n_x: int, n_u: int, N: int
+        self, initial_params: DynamicsConfig, n_x: int, n_u: int, N: int
     ):
         """
         Build a single Opti() problem that has:
@@ -71,7 +71,7 @@ class NLSParameterEstimator(ParameterEstimator):
         opti.solver("ipopt")
         return opti
 
-    def estimate(self, state: dict, control: np.ndarray) -> dynamics_config:
+    def estimate(self, state: dict, control: np.ndarray) -> DynamicsConfig:
         """
         Append one step of (x_{k-1}, u_{k-1}, x_k) to the history
         and re-solve for the best parameters.

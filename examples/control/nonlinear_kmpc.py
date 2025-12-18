@@ -3,7 +3,7 @@ import gymnasium as gym
 from f1tenth_gym.envs import F110Env
 import time
 
-from f1tenth_planning.control import Nonlinear_Kinematic_MPC_Planner
+from f1tenth_planning.control import NonlinearKinematicMPCPlanner
 
 
 def main():
@@ -25,7 +25,7 @@ def main():
     )
 
     # create planner
-    planner = Nonlinear_Kinematic_MPC_Planner(track=env.unwrapped.track)
+    planner = NonlinearKinematicMPCPlanner(track=env.unwrapped.track)
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)
     env.unwrapped.add_render_callback(planner.render_control_solution)

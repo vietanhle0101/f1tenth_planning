@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class model_config:
+class ModelConfig:
     """
     Neural model/value-function hyperparameters (kept simple; extend as needed).
     """

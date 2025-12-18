@@ -30,9 +30,9 @@ Last Modified: 5/5/22
 
 from f1tenth_gym.envs.track import Track
 from f1tenth_gym.envs.action import SteerActionEnum, LongitudinalActionEnum
-from f1tenth_planning.control.config.dynamics_config import dynamics_config, f1tenth_params
+from f1tenth_planning.control.config.dynamics_config import DynamicsConfig, f1tenth_params
 from f1tenth_planning.control.controller import Controller
-from f1tenth_planning.control.config.controller_config import lqr_config
+from f1tenth_planning.control.config.controller_config import LQRConfig
 from f1tenth_planning.utils.utils import nearest_point
 from f1tenth_planning.utils.utils import update_matrix
 from f1tenth_planning.utils.utils import solve_lqr
@@ -58,8 +58,8 @@ class LQRController(Controller):
     """
     def __init__(self, 
                  track: Track, 
-                 params: dynamics_config = f1tenth_params(), 
-                 config: lqr_config = lqr_config(),
+                 params: DynamicsConfig = f1tenth_params(), 
+                 config: LQRConfig = LQRConfig(),
                  ):
         super(LQRController, self).__init__(track, params,
                                             control_mode=(SteerActionEnum.Steering_Angle, LongitudinalActionEnum.Speed))
@@ -220,7 +220,7 @@ class LQRController(Controller):
         return steer_angle, v_ref
 
     def plan(
-        self, state:dict, waypoints=None, config : lqr_config = None
+        self, state:dict, waypoints=None, config : LQRConfig = None
     ):
         """
         Compute lateral control command for vehicle tracking.
@@ -233,7 +233,7 @@ class LQRController(Controller):
             - "linear_vel_x" (float): linear velocity of the vehicle.
             waypoints (numpy.ndarray [N x 5], optional): Array of waypoints to track, where each row is
             [x, y, velocity, heading, curvature]. If not none, this overrides the waypoints set during controller instantiation.
-            config (lqr_config, optional): Configuration parameters for the LQR controller. If not N
+            config (LQRConfig, optional): Configuration parameters for the LQR controller. If not N
 
         Returns:
             tuple:

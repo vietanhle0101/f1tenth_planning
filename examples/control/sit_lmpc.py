@@ -2,7 +2,7 @@ import numpy as np
 import gymnasium as gym
 from f1tenth_gym.envs import F110Env
 
-from f1tenth_planning.control import SITLMPCPlanner, Nonlinear_Dynamic_MPPI_Planner
+from f1tenth_planning.control import SITLMPCPlanner, NonlinearDynamicMPPIPlanner
 
 
 def main():
@@ -17,7 +17,7 @@ def main():
         render_mode="human",
     )
 
-    base_controller = Nonlinear_Dynamic_MPPI_Planner(track=env.unwrapped.track)
+    base_controller = NonlinearDynamicMPPIPlanner(track=env.unwrapped.track)
     planner = SITLMPCPlanner(track=env.unwrapped.track, base_controller=base_controller)
     env.unwrapped.add_render_callback(planner.render_waypoints)
     env.unwrapped.add_render_callback(planner.render_local_plan)

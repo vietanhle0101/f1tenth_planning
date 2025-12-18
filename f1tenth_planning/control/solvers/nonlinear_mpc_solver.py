@@ -1,27 +1,27 @@
 import numpy as np
 import casadi as ca
 
-from f1tenth_planning.control.dynamics_model import Dynamics_Model
-from f1tenth_planning.control.config.controller_config import mpc_config
+from f1tenth_planning.control.dynamics_model import DynamicsModel
+from f1tenth_planning.control.config.controller_config import MPCConfig
 from f1tenth_planning.control.discretizers import rk4_discretization
-from f1tenth_planning.control.mpc_solver import MPC_Solver
+from f1tenth_planning.control.mpc_solver import MPCSolver
 
 
-class Nonlinear_MPC_Solver(MPC_Solver):
+class NonlinearMPCSolver(MPCSolver):
     """
     NMPC Solver, uses CasADi to solve the nonlinear MPC problem using whatever model is passed in.
 
     Args:
         track (f1tenth_gym_ros:Track): track object, contains the reference raceline
-        config (mpc_config, optional): MPC configuration object, contains MPC costs and constraints
-        model (Dynamics_Model): dynamics model object, contains the vehicle dynamics
+        config (MPCConfig, optional): MPC configuration object, contains MPC costs and constraints
+        model (DynamicsModel): dynamics model object, contains the vehicle dynamics
         ipopt_opts (dict, optional): options for the IPOPT solver
     """
 
     def __init__(
         self,
-        config: mpc_config,
-        model: Dynamics_Model,
+        config: MPCConfig,
+        model: DynamicsModel,
         ipopt_opts: dict = None,
         discretizer=rk4_discretization,
     ) -> None:

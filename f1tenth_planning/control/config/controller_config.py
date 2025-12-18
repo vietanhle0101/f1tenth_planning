@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
-from typing import Tuple
+from typing import Callable, List
 import numpy as np
 
-from f1tenth_planning.control.config.model_config import model_config
+from f1tenth_planning.control.config.model_config import ModelConfig
 
 
 @dataclass
-class mpc_config:
+class MPCConfig:
     """
     Configuration for the MPC controller. Includes the following parameters:
 
@@ -72,9 +72,18 @@ class mpc_config:
 
 
 @dataclass
-class mppi_config(mpc_config):
+class MPPIConfig(MPCConfig):
     """
-    Configuration for the MPPI controller, inheriting from mpc_config and adding MPPI-specific parameters.
+    Configuration for the MPPI controller, inheriting from MPCConfig and adding MPPI-specific parameters.
+
+    Args:
+        n_iterations (int): Number of iterations for the MPPI solver.
+        n_samples (int): Number of samples for the MPPI solver.
+        temperature (float): Temperature for the MPPI solver.
+        damping (float): Damping for the MPPI solver.
+        u_std (float): Standard deviation of the control noise.
+        scan (bool): Whether to scan the control space.
+        adaptive_covariance (bool): Whether to adapt the covariance matrix.
     """
 
     # MPPI specific parameters
@@ -93,7 +102,7 @@ class mppi_config(mpc_config):
 
 def kinematic_mpc_config():
     # [x, y, delta, v, yaw]
-    return mpc_config(
+    return MPCConfig(
         nx=5,
         nu=2,
         N=15,
@@ -107,7 +116,7 @@ def kinematic_mpc_config():
 
 def dynamic_mpc_config():
     # [x, y, delta, v, yaw, yaw_rate, beta]
-    return mpc_config(
+    return MPCConfig(
         nx=7,
         nu=2,
         N=15,
@@ -121,15 +130,15 @@ def dynamic_mpc_config():
 
 def dynamic_mppi_config():
     # [x, y, delta, v, yaw, yaw_rate, beta]
-    return mppi_config(
+    return MPPIConfig(
         nx=7,
         nu=2,
-        N=20,
+        N=10,
         Q=np.diag([5.0, 5.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
         R=np.diag([0.0, 0.00]),
         Rd=np.diag([0.0, 0.00]),
         P=np.diag([5.0, 5.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
-        dt=0.05,
+        dt=0.1,
         n_iterations=2,
         n_samples=1024,
         adaptive_covariance=True,
@@ -138,7 +147,7 @@ def dynamic_mppi_config():
 
 
 @dataclass
-class lqr_config:
+class LQRConfig:
     """
     Configuration for the LQR controller. Includes the following parameters:
 
@@ -165,7 +174,7 @@ class lqr_config:
 
 
 @dataclass
-class lmpc_config:
+class LMPCConfig:
     """
     Configuration for LMPC algorithm-level parameters.
     """
@@ -179,36 +188,34 @@ class lmpc_config:
 
 
 @dataclass
-class safe_mppi_config:
+class APMPPIConfig(MPPIConfig):
     """
-    Configuration for Safe-MPPI solver (sampling, penalty multipliers, etc.).
+    Configuration for AP-MPPI solver (sampling, penalty multipliers, etc.).
+
+    Args:
+        n_lambdas (np.ndarray): Number of lambda penalty multipliers to sample in total.
+        lambdas_sample_range (np.ndarray): Range of the lambda penalty multipliers of size (n_constraints, 2).
+        constraints (List[Callable]): List of constraint functions.
     """
 
-    N: int = 10
-    dt: float = 0.1
-    nx: int = 7
-    nu: int = 2
-    n_iterations: int = 2
-    n_samples: int = 512
-    lambs_sample_range: Tuple[float, float] = (-1.0, 5.0)
-    n_lambs: int = 5
-    control_sample_std: np.ndarray = field(
-        default_factory=lambda: np.array([0.5, 0.5])
-    )
-    temperature: float = 0.01
-    damping: float = 0.001
-    adaptive_covariance: bool = True
-    a_cov_shift: bool = False
-    ss_relaxation: float = 0.0
-    obstacle_costfunc_size: float = 0.0
+    n_lambdas: np.ndarray = field(default=np.array([5]))
+    lambdas_sample_range: np.ndarray = field(default=np.array([-1.0, 5.0]))
+    constraints: List[Callable] = field(default=[])
+    n_constraints: int = field(default=0)
+
+    def __post_init__(self):
+        self.n_constraints = len(self.constraints)
+        assert self.lambdas_sample_range.shape == (self.n_constraints, 2), (
+            "lambdas_sample_range has incorrect dimensions"
+        )
 
 
 @dataclass
-class sit_lmpc_config:
+class SITLMPCConfig:
     """
     Combined configuration for Safe-MPPI + LMPC (IT-LMPC) controller.
     """
 
-    lmpc: lmpc_config = field(default_factory=lmpc_config)
-    safe_mppi: safe_mppi_config = field(default_factory=safe_mppi_config)
-    model: model_config = field(default_factory=model_config)
+    lmpc: LMPCConfig = field(default_factory=LMPCConfig)
+    ap_mppi: APMPPIConfig = field(default_factory=APMPPIConfig)
+    model: ModelConfig = field(default_factory=ModelConfig)

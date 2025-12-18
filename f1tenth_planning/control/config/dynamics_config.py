@@ -3,7 +3,7 @@ from f1tenth_gym.envs.f110_env import F110Env
 
 
 @dataclass
-class dynamics_config:
+class DynamicsConfig:
     """
     Vehicle dynamics configuration dataclass.
     This dataclass contains the vehicle dynamics parameters used for control and planning.
@@ -89,7 +89,7 @@ def _dynamics_config_from_gym_params(gym_params):
                 - "Cf" (float): Pacejka shape factor for the front tires.
                 - "Cr" (float): Pacejka shape factor for the rear tires.
     Returns:
-        dynamics_config: An object containing the vehicle dynamics parameters. Check the `dynamics_config` class for more details.
+        DynamicsConfig: An object containing the vehicle dynamics parameters. Check the `DynamicsConfig` class for more details.
     Notes:
         - If certain optional parameters are not provided in `gym_params`,
           they are computed using typical values or derived from other parameters.
@@ -157,7 +157,7 @@ def _dynamics_config_from_gym_params(gym_params):
         # Compute tire stiffness factor for the rear tires using the linear cornering stiffness
         BR = C_SR / (CR * DR) if DR != 0 else 0.0
 
-    return dynamics_config(
+    return DynamicsConfig(
         MIN_STEER=MIN_STEER,
         MAX_STEER=MAX_STEER,
         MIN_DSTEER=MIN_DSTEER,
@@ -186,36 +186,36 @@ def _dynamics_config_from_gym_params(gym_params):
 
 def f1tenth_params():
     """
-    Generate a `dynamics_config` object for the f1tenth vehicle.
-    This function creates a `dynamics_config` object using the default vehicle parameters
+    Generate a `DynamicsConfig` object for the f1tenth vehicle.
+    This function creates a `DynamicsConfig` object using the default vehicle parameters
     for the f1tenth vehicle used in the F1TENTH gym.
 
     Returns:
-        dynamics_config: An object containing the vehicle dynamics parameters for the f1tenth vehicle.
+        DynamicsConfig: An object containing the vehicle dynamics parameters for the f1tenth vehicle.
     """
     return _dynamics_config_from_gym_params(F110Env.f1tenth_vehicle_params())
 
 
 def f1fifth_params():
     """
-    Generate a `dynamics_config` object for the f1fifth vehicle.
-    This function creates a `dynamics_config` object using the default vehicle parameters
+    Generate a `DynamicsConfig` object for the f1fifth vehicle.
+    This function creates a `DynamicsConfig` object using the default vehicle parameters
     for the f1fifth vehicle used in the F1TENTH gym.
 
     Returns:
-        dynamics_config: An object containing the vehicle dynamics parameters for the f1fifth vehicle.
+        DynamicsConfig: An object containing the vehicle dynamics parameters for the f1fifth vehicle.
     """
     return _dynamics_config_from_gym_params(F110Env.f1fifth_vehicle_params())
 
 
 def fullscale_params():
     """ "
-    Generate a `dynamics_config` object for the fullscale vehicle.
-    This function creates a `dynamics_config` object using the default vehicle parameters
+    Generate a `DynamicsConfig` object for the fullscale vehicle.
+    This function creates a `DynamicsConfig` object using the default vehicle parameters
     for the fullscale vehicle used in the F1TENTH gym.
 
     Returns:
-        dynamics_config: An object containing the vehicle dynamics parameters for the fullscale vehicle.
+        DynamicsConfig: An object containing the vehicle dynamics parameters for the fullscale vehicle.
     """
     return _dynamics_config_from_gym_params(F110Env.fullscale_vehicle_params())
 
@@ -231,4 +231,4 @@ def update_config_from_dict(self, config_dict):
         if hasattr(self, key):
             setattr(self, key, value)
         else:
-            raise KeyError(f"Key '{key}' not found in dynamics_config.")
+            raise KeyError(f"Key '{key}' not found in DynamicsConfig.")

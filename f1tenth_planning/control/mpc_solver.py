@@ -1,16 +1,16 @@
 from __future__ import annotations
 from abc import abstractmethod, ABC
     
-from f1tenth_planning.control.config.controller_config import mpc_config
-from f1tenth_planning.control.dynamics_model import Dynamics_Model
+from f1tenth_planning.control.config.controller_config import MPCConfig
+from f1tenth_planning.control.dynamics_model import DynamicsModel
 
-class MPC_Solver(ABC):
+class MPCSolver(ABC):
     """
     Abstract base class for Model Predictive Control (MPC) solvers. Implemented MPC solvers should inherit from this class and implement all abstract methods for plug-and-play compatibility with MPC controllers.
     """
 
     @abstractmethod
-    def __init__(self, config: mpc_config, model: Dynamics_Model):
+    def __init__(self, config: MPCConfig, model: DynamicsModel):
         self.config = config
         self.model = model
 

@@ -2,32 +2,32 @@ import cvxpy
 import numpy as np
 from scipy.sparse import block_diag, csc_matrix
 
-from f1tenth_planning.control.config.controller_config import mpc_config
-from f1tenth_planning.control.dynamics_model import Dynamics_Model
+from f1tenth_planning.control.config.controller_config import MPCConfig
+from f1tenth_planning.control.dynamics_model import DynamicsModel
 from f1tenth_planning.control.discretizers import (
     euler_discretization,
     system_matrix_discretization,
 )
-from f1tenth_planning.control.mpc_solver import MPC_Solver
+from f1tenth_planning.control.mpc_solver import MPCSolver
 
 
-class LTV_MPC_Solver(MPC_Solver):
+class LTVMPCSolver(MPCSolver):
     """
     Formulates and solves a Linear Time-Varying Model Predictive Control (LTV-MPC) problem for a time-varying or nonlinear system tracking a reference trajectory. The system dynamics are linearized around the current trajectory at each timestep, and the resulting finite-horizon optimal control problem is solved using CVXPY.
     """
 
     def __init__(
         self,
-        config: mpc_config,
-        model: Dynamics_Model,
+        config: MPCConfig,
+        model: DynamicsModel,
         discretizer=euler_discretization,
         dynamics_discretizer=system_matrix_discretization,
     ):
         """
         Initialize the LTV-MPC solver with the given configuration and dynamics model.
         Args:
-            config (mpc_config): MPC configuration object, contains MPC costs and constraints
-            model (Dynamics_Model): dynamics model object, provides system dynamics and linearization
+            config (MPCConfig): MPC configuration object, contains MPC costs and constraints
+            model (DynamicsModel): dynamics model object, provides system dynamics and linearization
             discretizer (function, optional): function to discretize the continuous-time dynamics. Defaults to euler_discretization.
             dynamics_discretizer (function, optional): function to discretize the linearized system matrices. Defaults to system_matrix_discretization.
         """

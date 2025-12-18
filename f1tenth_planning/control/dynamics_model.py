@@ -5,20 +5,20 @@ import jax
 from jax import numpy as jnp
 import numpy as np
 import casadi as ca
-from f1tenth_planning.control.config.dynamics_config import dynamics_config
+from f1tenth_planning.control.config.dynamics_config import DynamicsConfig
 
-class Dynamics_Model(ABC):
+class DynamicsModel(ABC):
     @abstractmethod
-    def __init__(self, params: dynamics_config) -> None:
+    def __init__(self, params: DynamicsConfig) -> None:
         """
         Initialize the dynamics model.
 
         Args:
-            params (dynamics_config): vehicle dynamics parameters
+            params (DynamicsConfig): vehicle dynamics parameters
         """
         self.params = params
 
-    def f(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> np.ndarray:
+    def f(self, state: np.ndarray, control: np.ndarray, params: DynamicsConfig = None) -> np.ndarray:
         """
         (Non-)linear dynamics model. This function computes the state derivative given the current state and control input. Should be 
         paired with a numerical integrator to propagate the state forward in time (e.g. Runge-Kutta, Euler). All noise in state and control
@@ -30,14 +30,14 @@ class Dynamics_Model(ABC):
         Args:
             state (np.ndarray): observation as returned from the environment.
             control (np.ndarray): control input as (steering_angle, speed)
-            params (dynamics_config): vehicle dynamics parameters
+            params (DynamicsConfig): vehicle dynamics parameters
 
         Returns:
             np.ndarray: state derivative
         """
         raise NotImplementedError("control method not implemented")
 
-    def f_casadi(self, params: dynamics_config = None) -> ca.Function:
+    def f_casadi(self, params: DynamicsConfig = None) -> ca.Function:
         """
         (Non-)linear dynamics model in CasADi symbolic form. This function computes the state derivative given the current state and control 
         input. Should be paired with a numerical integrator to propagate the state forward in time (e.g. Runge-Kutta, Euler). All noise in state 
@@ -48,7 +48,7 @@ class Dynamics_Model(ABC):
             \dot{x} = f(x, u)
         
         Args:
-            params (dynamics_config): vehicle dynamics parameters, overwrites self.params if not None
+            params (DynamicsConfig): vehicle dynamics parameters, overwrites self.params if not None
 
         Returns:
             ca.Function: CasADi function for the state derivative
@@ -80,14 +80,14 @@ class Dynamics_Model(ABC):
         Args:
             state (jnp.ndarray): observation as returned from the environment.
             control (jnp.ndarray): control input as (steering_angle, speed)
-            params (dynamics_config): vehicle dynamics parameters
+            params (DynamicsConfig): vehicle dynamics parameters
 
         Returns:
             jnp.ndarray: state derivative
         """
         raise NotImplementedError("control method not implemented")
     
-    def linearize_around_state(self, state: np.ndarray, control: np.ndarray, params: dynamics_config = None) -> tuple[np.ndarray, np.ndarray]:
+    def linearize_around_state(self, state: np.ndarray, control: np.ndarray, params: DynamicsConfig = None) -> tuple[np.ndarray, np.ndarray]:
         """
         Linearize the dynamics model around a given state and control input. This function computes the state Jacobian and control Jacobian
         at the given state and control input. These Jacobians can be used in model-based controllers.
@@ -99,27 +99,27 @@ class Dynamics_Model(ABC):
         Args:
             state (np.ndarray): observation as returned from the environment.
             control (np.ndarray): control input as (steering_angle, speed)
-            params (dynamics_config): vehicle dynamics parameters, overwrites self.params if not None
+            params (DynamicsConfig): vehicle dynamics parameters, overwrites self.params if not None
 
         Returns:
             tuple[np.ndarray, np.ndarray]: state Jacobian, control Jacobian
         """
         raise NotImplementedError("linearize_around_state method not implemented")
     
-    def parameters_vector_from_config(self, params: dynamics_config) -> np.ndarray:
+    def parameters_vector_from_config(self, params: DynamicsConfig) -> np.ndarray:
         """
         Convert the dynamics configuration parameters into a vector format. This function is useful for optimization problems where the
         parameters need to be passed as a vector.
 
         Args:
-            params (dynamics_config): vehicle dynamics parameters
+            params (DynamicsConfig): vehicle dynamics parameters
 
         Returns:
             np.ndarray: (num_params, 1) vector of parameters
         """
         raise NotImplementedError("parameters_vector_from_config method not implemented")
     
-    def config_from_parameters_vector(self, params: np.ndarray) -> dynamics_config:
+    def config_from_parameters_vector(self, params: np.ndarray) -> DynamicsConfig:
         """
         Convert a vector of parameters into a dynamics configuration object. This function is useful for optimization problems where the
         parameters need to be passed as a vector.
@@ -133,7 +133,7 @@ class Dynamics_Model(ABC):
         raise NotImplementedError("config_from_parameters_vector method not implemented")
 
     @property
-    def num_params(self) -> dynamics_config:
+    def num_params(self) -> int:
         """
         Get the number of parameters from dynamics_config that are actively used in the model.
         This is useful for determining the size of the parameter vector in optimization problems.
@@ -141,17 +141,17 @@ class Dynamics_Model(ABC):
         raise NotImplementedError("num_params method not implemented")
 
     @property
-    def params(self) -> dynamics_config:
+    def params(self) -> DynamicsConfig:
         """
         Get the dynamics configuration parameters.
         """
         return self._params
 
     @params.setter
-    def params(self, value: dynamics_config) -> None:
+    def params(self, value: DynamicsConfig) -> None:
         """
         Set the dynamics configuration parameters without updating nx and nu fields.
         """
-        assert isinstance(value, dynamics_config), f"Expected dynamics_config, got {type(value)}"
+        assert isinstance(value, DynamicsConfig), f"Expected DynamicsConfig, got {type(value)}"
         self._params = value
 
