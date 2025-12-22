@@ -199,7 +199,7 @@ class APMPPIConfig(MPPIConfig):
     """
 
     n_lambdas: np.ndarray = field(default=np.array([5]))
-    lambdas_sample_range: np.ndarray = field(default=np.array([-1.0, 5.0]))
+    lambdas_sample_range: np.ndarray = field(default=np.array([0.0, 5.0]))
     constraints: List[Callable] = field(default=[])
     n_constraints: int = field(default=0)
 
@@ -208,6 +208,28 @@ class APMPPIConfig(MPPIConfig):
         assert self.lambdas_sample_range.shape == (self.n_constraints, 2), (
             "lambdas_sample_range has incorrect dimensions"
         )
+
+
+def dynamic_ap_mppi_config():
+    # [x, y, delta, v, yaw, yaw_rate, beta]
+    return APMPPIConfig(
+        nx=7,
+        nu=2,
+        N=10,
+        Q=np.diag([5.0, 5.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
+        R=np.diag([0.0, 0.00]),
+        Rd=np.diag([0.0, 0.00]),
+        P=np.diag([5.0, 5.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
+        dt=0.1,
+        n_iterations=2,
+        n_samples=1024,
+        adaptive_covariance=True,
+        scan=False,
+        n_lambdas=np.array([0]),
+        lambdas_sample_range=np.array([0.0, 5.0]),
+        constraints=[],
+        n_constraints=0,
+    )
 
 
 @dataclass
