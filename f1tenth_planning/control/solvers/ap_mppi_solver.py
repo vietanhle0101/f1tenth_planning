@@ -66,21 +66,27 @@ class APMPPISolver(MPCSolver):
 
     def _init_lambdas(self):
         """
-        Initialize the lambda penalty multipliers. Samples n_lambdas over the meshgrid of the constraint ranges.
+        Initialize the lambda penalty multipliers. Samples n_constraints x n_lambdas over the meshgrid of the constraint ranges.
         Returns:
-            np.ndarray: lambda penalty multipliers of shape (n_lambdas,).
+            np.ndarray: lambda penalty multipliers of shape (n_constraints, n_lambdas).
         """
         key = jax.random.PRNGKey(0)
         key, key_sample = jax.random.split(key)
 
-        low  = jnp.array(self.config.lambdas_sample_range[:, 0], dtype=jnp.float32)  # (n_constraints,)
-        high = jnp.array(self.config.lambdas_sample_range[:, 1], dtype=jnp.float32)  # (n_constraints,)
+        low = jnp.array(
+            self.config.lambdas_sample_range[:, 0], dtype=jnp.float32
+        )  # (n_constraints,)
+        high = jnp.array(
+            self.config.lambdas_sample_range[:, 1], dtype=jnp.float32
+        )  # (n_constraints,)
 
         lambdas = jax.random.uniform(
             key_sample,
             (self.config.n_constraints, self.config.n_lambdas),
             dtype=jnp.float32,
-            minval=low[:, None],   # make bounds broadcast to (self.config.n_constraints, self.config.n_lambdas)
+            minval=low[
+                :, None
+            ],  # make bounds broadcast to (self.config.n_constraints, self.config.n_lambdas)
             maxval=high[:, None],
         )
         return lambdas
@@ -152,20 +158,28 @@ class APMPPISolver(MPCSolver):
         # Compute weighted constraint costs for each lambda: [n_samples, n_lambdas, N]
         # lambdas: [C, L], c: [n_samples, C, N]
         # c_weighted[i, l, t] = sum_c(lambdas[c, l] * c[i, c, t])
-        c_weighted = jnp.einsum("scn,cl->sln", c, self.lambdas)  # [n_samples, n_lambdas, N]
+        c_weighted = jnp.einsum(
+            "scn,cl->sln", c, self.lambdas
+        )  # [n_samples, n_lambdas, N]
 
         # Compute modified rewards: r_modified[i, l, t] = r[i, t] - c_weighted[i, l, t]
         r_modified = r[:, None, :] - c_weighted  # [n_samples, n_lambdas, N]
 
         # Compute returns for each lambda: [n_samples, n_lambdas, N]
-        R_modified = jax.vmap(jax.vmap(self._returns))(r_modified)  # [n_samples, n_lambdas, N]
+        R_modified = jax.vmap(jax.vmap(self._returns))(
+            r_modified
+        )  # [n_samples, n_lambdas, N]
 
         # For each lambda, compute weights and optimal action perturbation
         # R_modified: [n_samples, n_lambdas, N] -> transpose to [n_lambdas, n_samples, N]
-        R_for_weights = jnp.transpose(R_modified, (1, 0, 2))  # [n_lambdas, n_samples, N]
+        R_for_weights = jnp.transpose(
+            R_modified, (1, 0, 2)
+        )  # [n_lambdas, n_samples, N]
 
         # Compute weights for each lambda and timestep: [n_lambdas, n_samples, N]
-        w_all = jax.vmap(lambda R_l: jax.vmap(self._weights, 1, 1)(R_l))(R_for_weights)  # [n_lambdas, n_samples, N]
+        w_all = jax.vmap(lambda R_l: jax.vmap(self._weights, 1, 1)(R_l))(
+            R_for_weights
+        )  # [n_lambdas, n_samples, N]
 
         # Compute optimal action perturbation for each lambda: [n_lambdas, N, nu]
         # da: [n_samples, N, nu], w_all: [n_lambdas, n_samples, N]
@@ -179,7 +193,9 @@ class APMPPISolver(MPCSolver):
         # Rollout each candidate to get trajectories
         s_candidates, r_candidates = jax.vmap(
             self._rollout, in_axes=(0, None, None, None, None, None)
-        )(a_candidates, env_state, ref_traj, p, Q, R)  # [n_lambdas, N, nx], [n_lambdas, N]
+        )(
+            a_candidates, env_state, ref_traj, p, Q, R
+        )  # [n_lambdas, N, nx], [n_lambdas, N]
 
         # Compute pure constraint violations for each candidate (sum of positive violations)
         c_candidates = jax.vmap(self.constraints_costs)(
@@ -202,7 +218,10 @@ class APMPPISolver(MPCSolver):
         infeasible_score = -violations
 
         # Combined score: use feasible_score if any feasible, else infeasible_score
-        combined_score = has_any_feasible * feasible_score + (1.0 - has_any_feasible) * infeasible_score
+        combined_score = (
+            has_any_feasible * feasible_score
+            + (1.0 - has_any_feasible) * infeasible_score
+        )
 
         # Select best trajectory
         best_idx = jnp.argmax(combined_score)
@@ -212,7 +231,9 @@ class APMPPISolver(MPCSolver):
         if self.config.adaptive_covariance:
             w_best = w_all[best_idx]  # [n_samples, N]
             a_cov_new = jax.vmap(jax.vmap(jnp.outer))(da, da)  # [n_samples, N, nu, nu]
-            a_cov_new = jax.vmap(jnp.average, (1, None, 1))(a_cov_new, 0, w_best)  # [N, nu, nu]
+            a_cov_new = jax.vmap(jnp.average, (1, None, 1))(
+                a_cov_new, 0, w_best
+            )  # [N, nu, nu]
             # prevent loss of rank when one sample is heavily weighted
             a_cov_new = a_cov_new + self.nu_eye * 0.00001
         else:
