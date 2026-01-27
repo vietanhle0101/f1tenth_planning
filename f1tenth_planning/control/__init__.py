@@ -9,10 +9,15 @@ from .controllers.mpc.nonlinear_mpc.nonlinear_dmpc import NonlinearDynamicMPCPla
 from .controllers.mpc.mppi.dynamic_mppi import (
     DynamicMPPIPlanner as NonlinearDynamicMPPIPlanner,
 )
-from .controllers.lmpc import (
-    LMPCController,
-    SITLMPCPlanner,
-    SimpleSafeSetStore,
-    SimpleValueFunctionModel,
-    LMPCIterationManager,
+from .controllers.mpc.ap_mppi.dynamic_ap_mppi import (
+    DynamicAPMPPIPlanner as NonlinearDynamicAPMPPIPlanner,
 )
+
+# TODO: Fix lmpc module - base.py is missing
+# from .controllers.lmpc import (
+#     LMPCController,
+#     SITLMPCPlanner,
+#     SimpleSafeSetStore,
+#     SimpleValueFunctionModel,
+#     LMPCIterationManager,
+# )
