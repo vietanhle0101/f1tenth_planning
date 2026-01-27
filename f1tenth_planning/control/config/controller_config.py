@@ -193,24 +193,51 @@ class APMPPIConfig(MPPIConfig):
     Configuration for AP-MPPI solver (sampling, penalty multipliers, etc.).
 
     Args:
-        n_lambdas (np.ndarray): Number of lambda penalty multipliers to sample in total.
+        n_lambdas (int): Number of lambda penalty multipliers to sample per constraint.
         lambdas_sample_range (np.ndarray): Range of the lambda penalty multipliers of size (n_constraints, 2).
-        constraints (List[Callable]): List of constraint functions.
+        constraints (List[Callable]): List of constraint functions. Each function should have signature
+            constraint(x, u) -> (N,) where positive values indicate violation.
     """
 
-    n_lambdas: np.ndarray = field(default=np.array([5]))
-    lambdas_sample_range: np.ndarray = field(default=np.array([0.0, 5.0]))
-    constraints: List[Callable] = field(default=[])
+    n_lambdas: int = field(default=16)
+    lambdas_sample_range: np.ndarray = field(default=None)
+    constraints: List[Callable] = field(default_factory=list)
     n_constraints: int = field(default=0)
 
     def __post_init__(self):
+        super().__post_init__()
         self.n_constraints = len(self.constraints)
-        assert self.lambdas_sample_range.shape == (self.n_constraints, 2), (
-            "lambdas_sample_range has incorrect dimensions"
-        )
+        # Default lambdas_sample_range if not provided
+        if self.lambdas_sample_range is None:
+            if self.n_constraints > 0:
+                self.lambdas_sample_range = np.tile(np.array([[0.0, 5.0]]), (self.n_constraints, 1))
+            else:
+                self.lambdas_sample_range = np.zeros((0, 2))
+        if self.n_constraints > 0:
+            assert self.lambdas_sample_range.shape == (self.n_constraints, 2), (
+                f"lambdas_sample_range has incorrect dimensions: {self.lambdas_sample_range.shape} != ({self.n_constraints}, 2)"
+            )
 
 
-def dynamic_ap_mppi_config():
+def dynamic_ap_mppi_config(
+    constraints: List[Callable] = None,
+    lambdas_sample_range: np.ndarray = None,
+    n_lambdas: int = 16,
+):
+    """
+    Create a default AP-MPPI config for dynamic bicycle model.
+
+    Args:
+        constraints: List of constraint functions. Each should have signature
+            constraint(x, u) -> (N,) where positive values indicate violation.
+        lambdas_sample_range: Range for lambda sampling, shape (n_constraints, 2).
+        n_lambdas: Number of lambda samples per constraint.
+
+    Returns:
+        APMPPIConfig configured for dynamic bicycle model.
+    """
+    if constraints is None:
+        constraints = []
     # [x, y, delta, v, yaw, yaw_rate, beta]
     return APMPPIConfig(
         nx=7,
@@ -225,10 +252,9 @@ def dynamic_ap_mppi_config():
         n_samples=1024,
         adaptive_covariance=True,
         scan=False,
-        n_lambdas=np.array([0]),
-        lambdas_sample_range=np.array([0.0, 5.0]),
-        constraints=[],
-        n_constraints=0,
+        n_lambdas=n_lambdas,
+        lambdas_sample_range=lambdas_sample_range,
+        constraints=constraints,
     )
 
 
