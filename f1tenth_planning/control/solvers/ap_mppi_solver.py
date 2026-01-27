@@ -21,7 +21,7 @@ class APMPPISolver(MPCSolver):
     Adaptive-Penalty Model Predictive Path Integral (AP-MPPI) solver.
     paper: https://ieeexplore.ieee.org/document/11260933
     website: https://sites.google.com/view/sit-lmpc/
-    base code: https://github.com/zzangupenn/S2ITO_LMPC/tree/sit_lmpc
+    base code: https://github.com/mlab-upenn/SIT-LMPC
 
     Args:
         config (MPPIConfig): MPPI configuration object, contains MPPI costs and constraints
@@ -244,9 +244,17 @@ class APMPPISolver(MPCSolver):
     def _step(self, x, u, p):
         """
         Single-step state prediction function.
+        Clips the next state to the physical limits defined in config.x_min and config.x_max.
+
+        Args:
+            x (np.ndarray): current state of shape (nx,)
+            u (np.ndarray): current control input of shape (nu,)
+            p (np.ndarray): dynamics parameters vector
+        Returns:
+            np.ndarray: next state of shape (nx,)
         """
         next_x = self.discretizer(self.model.f_jax, x, u, p, self.config.dt)
-        # Clip the next state to the bounds
+        # Clip to the physical limits of the car (assumes x_min and x_max are physical limits)
         next_x = jnp.clip(next_x, self.config.x_min, self.config.x_max)
         return next_x
 
