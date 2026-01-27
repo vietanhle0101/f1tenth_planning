@@ -21,6 +21,7 @@ class Controller(ABC):
         self.control_mode = control_mode
         self.waypoints = None
         self.waypoint_render = None
+        self._waypoints_color = (0, 128, 0)
 
     @abstractmethod
     def plan(self, state: dict, waypoints: np.ndarray = None, **kwargs) -> np.ndarray:
@@ -44,7 +45,7 @@ class Controller(ABC):
 
         For example, we can visualize trajectories of different colors for different agents by changing this color.
         """
-        return 0, 128, 0
+        return self._waypoints_color
 
     @waypoints_color.setter
     def waypoints_color(self, value: tuple[int, int, int]) -> None:
@@ -52,7 +53,7 @@ class Controller(ABC):
         Set color as rgb tuple used for rendering waypoints (global plan).
         """
         assert len(value) == 3, f"color must be a tuple of length 3, got {value}"
-        self.color = value
+        self._waypoints_color = value
 
     def render_waypoints(self, e):
         """
