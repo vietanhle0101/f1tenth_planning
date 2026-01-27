@@ -26,6 +26,9 @@ class MPCController(Controller):
             default f1tenth_params() will be used.
         pre_processing_fn (function, optional): Function to preprocess the state and reference trajectory before calling the solver.
             Should take in (x0, xref) and return processed (x0, xref). If none, no preprocessing is done.
+        ref_velocity_bounds (tuple[float, float], optional): (v_min, v_max) bounds for clipping reference trajectory velocities.
+            If None, uses solver's x_min[3] and x_max[3]. Use this to set operational speed limits
+            that differ from the physical limits used by the solver for rollout clipping.
     """
 
     def __init__(
@@ -35,6 +38,7 @@ class MPCController(Controller):
         model: DynamicsModel,
         params: DynamicsConfig = f1tenth_params(),
         pre_processing_fn=None,
+        ref_velocity_bounds=None,
     ):
         super().__init__(
             track,
@@ -57,6 +61,13 @@ class MPCController(Controller):
         self.solver = solver
 
         self.pre_processing_fn = pre_processing_fn
+
+        # Reference velocity bounds (for clipping reference trajectory)
+        if ref_velocity_bounds is None:
+            self.ref_v_min = self.solver.config.x_min[3]
+            self.ref_v_max = self.solver.config.x_max[3]
+        else:
+            self.ref_v_min, self.ref_v_max = ref_velocity_bounds
 
         self.x_pred = None
         self.ref_traj = None
@@ -161,13 +172,18 @@ class MPCController(Controller):
         cy = self.waypoints[:, 1]
         cv = self.waypoints[:, 3]
 
+        # Clip the reference velocity to the operational speed limits
+        # --> Ensures that the interpolated trajectory does not assume
+        #     the vehicle will go faster than it should.
+        clipped_velocity = np.clip(cv, a_min=self.ref_v_min, a_max=self.ref_v_max)
+
         self.ref_traj = calc_interpolated_reference_trajectory(
             x,
             y,
             yaw,
             cx,
             cy,
-            cv,
+            clipped_velocity,
             self.solver.config.dt,
             self.solver.config.N,
             self.waypoints,
