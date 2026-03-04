@@ -196,6 +196,7 @@ class DynamicAPMPPIPlanner(MPCController):
 
         if solver is None:
             solver = APMPPISolver(config, model)
+            
         super(DynamicAPMPPIPlanner, self).__init__(
             track,
             solver,

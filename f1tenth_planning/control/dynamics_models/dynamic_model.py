@@ -6,7 +6,7 @@ import numpy as np
 import casadi as ca
 import jax
 import jax.numpy as jnp
-
+import torch
 
 class DynamicBicycleModel(DynamicsModel):
     """
