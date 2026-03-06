@@ -156,6 +156,102 @@ class DynamicBicycleModel(DynamicsModel):
         f = ca.Function("f", [states, controls, params], [RHS])
         return f
 
+    def f_torch(
+            self, state: torch.Tensor, control: torch.Tensor, params: torch.Tensor
+        ) -> torch.Tensor:
+        """
+        Torch version of the dynamics function. 
+        This function is useful for differentiable MPC solvers that use PyTorch for autodiff.
+
+        Inputs
+        ------
+        state:  (..., 7)  = [x, y, delta, v, yaw, yaw_rate, slip_angle]
+        control:(..., 2)  = [delta_v, a]
+        params: (9,1) or (9,) or (...,9) = [mu, m, I, lr, lf, C_Sf, C_Sr, h, g]
+
+        Returns
+        -------
+        xdot: (..., 7) = [dx, dy, ddelta, dv, dyaw, ddyaw, dslip_angle]
+        """
+        v_switch: float = 1.5 # Speed threshold (m/s) to switch low-speed vs high-speed dynamics.
+        eps_v: float = 1e-6 # Small constant to avoid division by zero in terms with 1/v and 1/v^2.
+
+        # Unpack parameters
+        mu = params[0, 0]
+        m  = params[1, 0]
+        I  = params[2, 0]
+        lr = params[3, 0]
+        lf = params[4, 0]
+        C_Sf = params[5, 0]
+        C_Sr = params[6, 0]
+        h  = params[7, 0]
+        g  = params[8, 0]
+        wheelbase = lf + lr
+
+        # ---- unpack state/control ----
+        x, y, delta, v, yaw, yaw_rate, slip_angle = torch.unbind(state, dim=-1)
+        delta_v, a = torch.unbind(control, dim=-1)
+
+        # ---- state derivatives ----
+        dx = v * torch.cos(yaw + slip_angle)
+        dy = v * torch.sin(yaw + slip_angle)
+        ddelta = delta_v
+        dv = a
+
+        # Low-speed (kinematic-ish)
+        dyaw_ks = v * torch.cos(slip_angle) * torch.tan(delta) / wheelbase
+        dslip_angle_ks = (lr * delta_v) / (
+            wheelbase
+            * (torch.cos(delta) ** 2)
+            * (1.0 + (torch.tan(delta) ** 2 * lr / wheelbase) ** 2)
+        )
+        ddyaw_ks = (1.0 / wheelbase) * (
+            a * torch.cos(slip_angle) * torch.tan(delta)
+            - v * torch.sin(slip_angle) * torch.tan(delta) * dslip_angle_ks
+            + v * torch.cos(slip_angle) * delta_v / (torch.cos(delta) ** 2)
+        )
+
+        # High-speed (single-track)
+        dyaw_st = yaw_rate
+
+        # Guard divisions by v
+        v_safe = torch.where(torch.abs(v) > eps_v, v, torch.full_like(v, eps_v))
+        ddyaw_st = (
+            -mu
+            * m
+            / (v_safe * I * (lr + lf))
+            * (lf**2 * C_Sf * (g * lr - a * h) + lr**2 * C_Sr * (g * lf + a * h))
+            * yaw_rate
+            + mu
+            * m
+            / (I * (lr + lf))
+            * (lr * C_Sr * (g * lf + a * h) - lf * C_Sf * (g * lr - a * h))
+            * slip_angle
+            + mu * m / (I * (lr + lf)) * lf * C_Sf * (g * lr - a * h) * delta
+        )
+
+        dslip_angle_st = (
+            (
+                mu
+                / (v_safe**2 * (lr + lf))
+                * (C_Sr * (g * lf + a * h) * lr - C_Sf * (g * lr - a * h) * lf)
+                - 1.0
+            )
+            * yaw_rate
+            - mu
+            / (v_safe * (lr + lf))
+            * (C_Sr * (g * lf + a * h) + C_Sf * (g * lr - a * h))
+            * slip_angle
+            + mu / (v_safe * (lr + lf)) * (C_Sf * (g * lr - a * h)) * delta
+        )
+
+        cond = (torch.abs(v) <= v_switch)
+        dyaw = torch.where(cond, dyaw_ks, dyaw_st)
+        ddyaw = torch.where(cond, ddyaw_ks, ddyaw_st)
+        dslip = torch.where(cond, dslip_angle_ks, dslip_angle_st)
+
+        return torch.stack([dx, dy, ddelta, dv, dyaw, ddyaw, dslip], dim=-1)
+
     @partial(jax.jit, static_argnums=(0))
     def f_jax(
         self, state: jnp.ndarray, control: jnp.ndarray, params: jnp.ndarray
