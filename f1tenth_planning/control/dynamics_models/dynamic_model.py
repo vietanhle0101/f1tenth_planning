@@ -160,8 +160,7 @@ class DynamicBicycleModel(DynamicsModel):
             self, state: torch.Tensor, control: torch.Tensor, params: torch.Tensor
         ) -> torch.Tensor:
         """
-        Torch version of the dynamics function. 
-        This function is useful for differentiable MPC solvers that use PyTorch for autodiff.
+        Torch version of the dynamics function.
 
         Inputs
         ------
@@ -173,24 +172,32 @@ class DynamicBicycleModel(DynamicsModel):
         -------
         xdot: (..., 7) = [dx, dy, ddelta, dv, dyaw, ddyaw, dslip_angle]
         """
-        v_switch: float = 1.5 # Speed threshold (m/s) to switch low-speed vs high-speed dynamics.
-        eps_v: float = 1e-2 # Small constant to avoid division by zero in terms with 1/v and 1/v^2.
+        v_switch: float = 1.5
+        eps_v: float = 1e-2
+        eps_cos2: float = 1e-4
 
         # Unpack parameters
         mu = params[0, 0]
-        m  = params[1, 0]
-        I  = params[2, 0]
+        m = params[1, 0]
+        I = params[2, 0]
         lr = params[3, 0]
         lf = params[4, 0]
         C_Sf = params[5, 0]
         C_Sr = params[6, 0]
-        h  = params[7, 0]
-        g  = params[8, 0]
+        h = params[7, 0]
+        g = params[8, 0]
         wheelbase = lf + lr
 
         # ---- unpack state/control ----
         x, y, delta, v, yaw, yaw_rate, slip_angle = torch.unbind(state, dim=-1)
         delta_v, a = torch.unbind(control, dim=-1)
+
+        # Numerical guards for steering singularities
+        # Keep away from tan/cos blow-ups near +/- pi/2.
+        delta_safe = torch.clamp(delta, -1.2, 1.2)
+        tan_delta = torch.tan(delta_safe)
+        cos_delta = torch.cos(delta_safe)
+        cos2_delta = torch.clamp(cos_delta * cos_delta, min=eps_cos2)
 
         # ---- state derivatives ----
         dx = v * torch.cos(yaw + slip_angle)
@@ -199,23 +206,25 @@ class DynamicBicycleModel(DynamicsModel):
         dv = a
 
         # Low-speed (kinematic-ish)
-        dyaw_ks = v * torch.cos(slip_angle) * torch.tan(delta) / wheelbase
+        dyaw_ks = v * torch.cos(slip_angle) * tan_delta / wheelbase
         dslip_angle_ks = (lr * delta_v) / (
             wheelbase
-            * (torch.cos(delta) ** 2)
-            * (1.0 + (torch.tan(delta) ** 2 * lr / wheelbase) ** 2)
+            * cos2_delta
+            * (1.0 + (tan_delta * tan_delta * lr / wheelbase) ** 2)
         )
         ddyaw_ks = (1.0 / wheelbase) * (
-            a * torch.cos(slip_angle) * torch.tan(delta)
-            - v * torch.sin(slip_angle) * torch.tan(delta) * dslip_angle_ks
-            + v * torch.cos(slip_angle) * delta_v / (torch.cos(delta) ** 2)
+            a * torch.cos(slip_angle) * tan_delta
+            - v * torch.sin(slip_angle) * tan_delta * dslip_angle_ks
+            + v * torch.cos(slip_angle) * delta_v / cos2_delta
         )
 
         # High-speed (single-track)
         dyaw_st = yaw_rate
 
-        # Guard divisions by v
-        v_safe = torch.where(torch.abs(v) > eps_v, v, torch.full_like(v, eps_v))
+        # Guard divisions by v while preserving sign
+        sign_v = torch.where(v >= 0.0, torch.ones_like(v), -torch.ones_like(v))
+        v_safe = torch.where(torch.abs(v) > eps_v, v, sign_v * eps_v)
+
         ddyaw_st = (
             -mu
             * m
@@ -227,7 +236,7 @@ class DynamicBicycleModel(DynamicsModel):
             / (I * (lr + lf))
             * (lr * C_Sr * (g * lf + a * h) - lf * C_Sf * (g * lr - a * h))
             * slip_angle
-            + mu * m / (I * (lr + lf)) * lf * C_Sf * (g * lr - a * h) * delta
+            + mu * m / (I * (lr + lf)) * lf * C_Sf * (g * lr - a * h) * delta_safe
         )
 
         dslip_angle_st = (
@@ -242,13 +251,17 @@ class DynamicBicycleModel(DynamicsModel):
             / (v_safe * (lr + lf))
             * (C_Sr * (g * lf + a * h) + C_Sf * (g * lr - a * h))
             * slip_angle
-            + mu / (v_safe * (lr + lf)) * (C_Sf * (g * lr - a * h)) * delta
+            + mu / (v_safe * (lr + lf)) * (C_Sf * (g * lr - a * h)) * delta_safe
         )
 
-        cond = (torch.abs(v) <= v_switch)
+        cond = torch.abs(v) <= v_switch
         dyaw = torch.where(cond, dyaw_ks, dyaw_st)
         ddyaw = torch.where(cond, ddyaw_ks, ddyaw_st)
         dslip = torch.where(cond, dslip_angle_ks, dslip_angle_st)
+
+        # Optional derivative clipping for extra robustness
+        ddyaw = torch.clamp(ddyaw, -100.0, 100.0)
+        dslip = torch.clamp(dslip, -100.0, 100.0)
 
         return torch.stack([dx, dy, ddelta, dv, dyaw, ddyaw, dslip], dim=-1)
 
