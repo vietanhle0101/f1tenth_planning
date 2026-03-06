@@ -174,7 +174,7 @@ class DynamicBicycleModel(DynamicsModel):
         xdot: (..., 7) = [dx, dy, ddelta, dv, dyaw, ddyaw, dslip_angle]
         """
         v_switch: float = 1.5 # Speed threshold (m/s) to switch low-speed vs high-speed dynamics.
-        eps_v: float = 1e-6 # Small constant to avoid division by zero in terms with 1/v and 1/v^2.
+        eps_v: float = 1e-2 # Small constant to avoid division by zero in terms with 1/v and 1/v^2.
 
         # Unpack parameters
         mu = params[0, 0]
