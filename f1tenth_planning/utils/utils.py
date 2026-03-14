@@ -144,7 +144,7 @@ def calc_interpolated_reference_trajectory(
     ref_list = (1 - t_list).reshape(-1, 1) * prev_states + t_list.reshape(
         -1, 1
     ) * next_states
-    return ref_list
+    return ref_list, ind_list
 
 
 @njit(cache=True)

@@ -243,8 +243,8 @@ def dynamic_ap_mppi_config(
         nx=7,
         nu=2,
         N=10,
-        Q = np.diag([1e1, 1e1, 1e0, 0.0, 1e0, 0.0, 0.0]), # State tracking cost
-        R = np.diag([1e0, 1e-1]), # Control effort cost
+        Q=np.diag([5.0, 5.0, 0.0, 5.0, 0.0, 0.0, 0.0]),
+        R=np.diag([0.0, 0.00]),
         Rd = np.diag([0.0, 0.0]), # Control rate cost
         P = np.diag([1e1, 1e1, 1e0, 0.0, 1e0, 0.0, 0.0]), # Terminal cost same as state cost
         dt=0.1,

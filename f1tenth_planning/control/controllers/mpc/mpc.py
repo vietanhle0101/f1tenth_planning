@@ -177,7 +177,7 @@ class MPCController(Controller):
         #     the vehicle will go faster than it should.
         clipped_velocity = np.clip(cv, a_min=self.ref_v_min, a_max=self.ref_v_max)
 
-        self.ref_traj = calc_interpolated_reference_trajectory(
+        self.ref_traj, _ = calc_interpolated_reference_trajectory(
             x,
             y,
             yaw,
@@ -187,7 +187,9 @@ class MPCController(Controller):
             self.solver.config.dt,
             self.solver.config.N,
             self.waypoints,
-        ).T.copy()
+        )
+
+        self.ref_traj = self.ref_traj.T.copy()
         p = None
         if params is not None:
             p = self.model.parameters_vector_from_config(params)
